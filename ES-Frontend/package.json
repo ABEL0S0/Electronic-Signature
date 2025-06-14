@@ -1,0 +1,44 @@
+{
+  "name": "vue-login",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc -b && vite build",
+    "preview": "vite preview",
+    "server": "tsx src/server/index.ts",
+    "dev:all": "concurrently \"npm run dev\" \"npm run server\""
+  },
+  "dependencies": {
+    "@iconify/vue": "^5.0.0",
+    "@tailwindcss/vite": "^4.1.7",
+    "@types/axios": "^0.14.4",
+    "@types/bcryptjs": "^3.0.0",
+    "@types/cors": "^2.8.18",
+    "@types/express": "^5.0.2",
+    "@types/jsonwebtoken": "^9.0.9",
+    "@types/node": "^22.15.21",
+    "axios": "^1.9.0",
+    "bcryptjs": "^3.0.2",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "tailwindcss": "^4.1.7",
+    "vue": "^3.5.13"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.3",
+    "@vue/tsconfig": "^0.7.0",
+    "autoprefixer": "^10.4.21",
+    "concurrently": "^9.1.2",
+    "postcss": "^8.5.3",
+    "typescript": "~5.8.3",
+    "vite": "^6.3.5",
+    "tsx": "^4.19.4",
+    "vue-tsc": "^2.2.8"
+  },
+  "trustedDependencies": [
+    "@tailwindcss/oxide"
+  ]
+}
