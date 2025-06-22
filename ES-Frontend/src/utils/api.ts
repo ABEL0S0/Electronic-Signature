@@ -46,4 +46,30 @@ export function register(
   });
 }
 
+export function uploadCertificate(file: File, password: string) {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("password", password);
+
+  return api.post("/api/certificates", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+}
+
+export function uploadDocument(file: File, userUuid: string, signature: string, hashAlgorithm: string) {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("userUuid", userUuid);
+  formData.append("signature", signature);
+  formData.append("hashAlgorithm", hashAlgorithm);
+
+  return api.post("/api/documents/upload", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+}
+
 export { api };
