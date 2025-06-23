@@ -46,6 +46,7 @@ export function register(
   });
 }
 
+// Certificados
 export function uploadCertificate(file: File, password: string) {
   const formData = new FormData();
   formData.append("file", file);
@@ -58,18 +59,53 @@ export function uploadCertificate(file: File, password: string) {
   });
 }
 
-export function uploadDocument(file: File, userUuid: string, signature: string, hashAlgorithm: string) {
+export function downloadCertificate(id: string, password: string) {
+  return api.get(`/api/certificates/${id}`, {
+    params: { password },
+    responseType: 'arraybuffer',
+  });
+}
+
+export function getCertificatesByUser(user: string) {
+  return api.get(`/api/certificates/user/${user}`);
+}
+
+export function deleteCertificate(id: string) {
+  return api.delete(`/api/certificates/${id}`);
+}
+
+export function deleteCertificatesByUser(user: string) {
+  return api.delete(`/api/certificates/user/${user}`);
+}
+
+// Documentos
+export function uploadDocument(file: File) {
   const formData = new FormData();
   formData.append("file", file);
-  formData.append("userUuid", userUuid);
-  formData.append("signature", signature);
-  formData.append("hashAlgorithm", hashAlgorithm);
 
   return api.post("/api/documents/upload", formData, {
     headers: {
       "Content-Type": "multipart/form-data",
     },
   });
+}
+
+export function downloadDocument(id: string) {
+  return api.get(`/api/documents/download/${id}`, {
+    responseType: 'blob',
+  });
+}
+
+export function getDocumentsByUser() {
+  return api.get(`/api/documents/list`);
+}
+
+export function deleteDocument(id: string) {
+  return api.delete(`/api/documents/${id}`);
+}
+
+export function deleteDocumentsByUser(user: string) {
+  return api.delete(`/api/documents/user/${user}`);
 }
 
 export { api };

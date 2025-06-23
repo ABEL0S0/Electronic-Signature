@@ -9,8 +9,11 @@ import com.ES.Backend.repository.DocumentMetadataRepository;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -25,7 +28,7 @@ public class DocumentMetadataService {
         this.repository = repository;
     }
 
-    public DocumentMetadata saveDocument(MultipartFile file, String userUuid, String signature, String hashAlgorithm) throws IOException {
+    public DocumentMetadata saveDocument(MultipartFile file, String user) throws IOException {
         String rootPath = Paths.get("files").toAbsolutePath().toString();
         String fileName = UUID.randomUUID() + "_" + file.getOriginalFilename();
         String fullPath = rootPath + File.separator + uploadPath + File.separator + fileName;
@@ -37,13 +40,41 @@ public class DocumentMetadataService {
 
 
         DocumentMetadata metadata = new DocumentMetadata();
-        metadata.setUserUuid(userUuid);
+        metadata.setuser(user);
         metadata.setFileName(fileName);
         metadata.setFilePath(fullPath);
-        metadata.setSignature(signature);
-        metadata.setHashAlgorithm(hashAlgorithm);
         metadata.setUploadedAt(LocalDateTime.now());
 
         return repository.save(metadata);
+    }
+
+    public List<DocumentMetadata> getDocumentsByUser(String user) {
+        return repository.findByuser(user);
+    }
+
+    public void deleteDocumentsByUser(String user) {
+        List<DocumentMetadata> documents = repository.findByuser(user);
+        for (DocumentMetadata metadata : documents) {
+            try {
+                Files.deleteIfExists(Paths.get(metadata.getFilePath()));
+            } catch (IOException e) {
+                System.err.println("Error deleting file: " + metadata.getFilePath() + " - " + e.getMessage());
+            }
+        }
+        repository.deleteByuser(user);
+    }
+
+    public void deleteDocument(String id) throws IOException {
+        DocumentMetadata metadata = repository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Document with id " + id + " not found."));
+        
+        Files.deleteIfExists(Paths.get(metadata.getFilePath()));
+        repository.deleteById(id);
+    }
+
+    public DocumentMetadata downloadDocument(String id) {
+        DocumentMetadata metadata = repository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Documento no encontrado"));
+        return metadata;
     }
 }

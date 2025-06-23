@@ -1,25 +1,21 @@
 <script setup>
 import { ref, onMounted } from "vue";
 import { authService, authState } from "../service/Auth";
-import { uploadDocument, uploadCertificate } from "../utils/api";
+import { uploadDocument, uploadCertificate, getDocumentsByUser, getCertificatesByUser, deleteDocument, deleteCertificate, downloadDocument, downloadCertificate } from "../utils/api";
 
 // Reactive data
-const selectedFile = ref(null);
-const uploadStatus = ref("");
 const documents = ref([]);
 const certificates = ref([]);
 const activeTab = ref("upload"); // upload, sign, documents
 
 // Get user info
-const user = authState.user;
-const userName = user ? `${user.firstName} ${user.lastName}` : "Usuario";
+const currentUser = authState.user;
+const userName = currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : "Usuario";
 
 // Documento
 const documentFile = ref(null);
 const documentStatus = ref("");
-const userUuid = ref(authState.user?.uuid || "");
-const signature = ref("");
-const hashAlgorithm = ref("SHA256");
+const user = ref(authState.user?.email || "");
 
 // Certificado
 const certificateFile = ref(null);
@@ -34,64 +30,17 @@ function handleSignOut() {
   window.location.hash = "/";
 }
 
-// File upload handling
-function handleFileSelect(event) {
-  selectedFile.value = event.target.files[0];
-  uploadStatus.value = "";
-}
-
-async function uploadFile() {
-  if (!selectedFile.value) {
-    uploadStatus.value = "Por favor selecciona un archivo";
-    return;
-  }
-
-  const formData = new FormData();
-  formData.append("file", selectedFile.value);
-
+async function loadUserFiles() {
+  if (!user.value) return;
   try {
-    uploadStatus.value = "Subiendo archivo...";
-    
-    const response = await fetch("http://localhost:8080/api/documents/upload", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${authState.token}`,
-      },
-      body: formData,
-    });
-
-    if (response.ok) {
-      uploadStatus.value = "Archivo subido exitosamente";
-      selectedFile.value = null;
-      // Reset file input
-      const fileInput = document.getElementById("fileInput");
-      if (fileInput) fileInput.value = "";
-      // Refresh documents list
-      loadDocuments();
-    } else {
-      uploadStatus.value = "Error al subir el archivo";
-    }
+    const [docsResponse, certsResponse] = await Promise.all([
+      getDocumentsByUser(),
+      getCertificatesByUser(user.value)
+    ]);
+    documents.value = docsResponse.data;
+    certificates.value = certsResponse.data;
   } catch (error) {
-    uploadStatus.value = "Error de conexión";
-    console.error("Error:", error);
-  }
-}
-
-async function loadDocuments() {
-  try {
-    const response = await fetch("http://localhost:8080/api/documents", {
-      headers: {
-        "Authorization": `Bearer ${authState.token}`,
-      },
-    });
-
-    if (response.ok) {
-      const data = await response.json();
-      documents.value = data.filter(doc => doc.type === "PDF");
-      certificates.value = data.filter(doc => doc.type === "CERTIFICATE");
-    }
-  } catch (error) {
-    console.error("Error loading documents:", error);
+    console.error("Error loading documents or certificates:", error);
   }
 }
 
@@ -101,18 +50,16 @@ function handleDocumentFileSelect(event) {
 }
 
 async function handleUploadDocument() {
-  if (!documentFile.value || !userUuid.value || !signature.value || !hashAlgorithm.value) {
-    documentStatus.value = "Completa todos los campos";
+  if (!documentFile.value) {
+    documentStatus.value = "Selecciona un archivo";
     return;
   }
   documentStatus.value = "Subiendo documento...";
   try {
-    await uploadDocument(documentFile.value, userUuid.value, signature.value, hashAlgorithm.value);
+    await uploadDocument(documentFile.value);
     documentStatus.value = "Documento subido exitosamente";
     documentFile.value = null;
-    signature.value = "";
-    // Recargar documentos si es necesario
-    loadDocuments();
+    loadUserFiles();
   } catch (e) {
     documentStatus.value = "Error al subir el documento";
   }
@@ -134,15 +81,73 @@ async function handleUploadCertificate() {
     certificateStatus.value = "Certificado subido exitosamente";
     certificateFile.value = null;
     certificatePassword.value = "";
-    // Recargar certificados si es necesario
-    loadDocuments();
+    loadUserFiles();
   } catch (e) {
     certificateStatus.value = "Error al subir el certificado";
   }
 }
 
+async function handleDeleteDocument(docId) {
+  if (!confirm("¿Estás seguro de que quieres eliminar este documento?")) return;
+  try {
+    await deleteDocument(docId);
+    loadUserFiles();
+  } catch (error) {
+    console.error("Error deleting document:", error);
+    alert("Error al eliminar el documento.");
+  }
+}
+
+async function handleDeleteCertificate(certId) {
+  if (!confirm("¿Estás seguro de que quieres eliminar este certificado?")) return;
+  try {
+    await deleteCertificate(certId);
+    loadUserFiles();
+  } catch (error) {
+    console.error("Error deleting certificate:", error);
+    alert("Error al eliminar el certificado.");
+  }
+}
+
+async function handleDownloadDocument(doc) {
+  try {
+    const response = await downloadDocument(doc.id);
+    const blob = new Blob([response.data], { type: response.headers['content-type'] });
+    const link = document.createElement('a');
+    link.href = window.URL.createObjectURL(blob);
+    link.download = doc.fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  } catch (error) {
+    console.error("Error downloading document:", error);
+    alert("Error al descargar el documento.");
+  }
+}
+
+async function handleDownloadCertificate(cert) {
+  const password = prompt("Introduce la contraseña del certificado:");
+  if (!password) {
+    alert("La contraseña es obligatoria para descargar el certificado.");
+    return;
+  }
+  try {
+    const response = await downloadCertificate(cert.id, password);
+    const blob = new Blob([response.data], { type: 'application/octet-stream' });
+    const link = document.createElement('a');
+    link.href = window.URL.createObjectURL(blob);
+    link.download = cert.filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  } catch (error) {
+    console.error("Error downloading certificate:", error);
+    alert("Error al descargar el certificado. Verifica la contraseña.");
+  }
+}
+
 onMounted(() => {
-  loadDocuments();
+  loadUserFiles();
 });
 </script>
 
@@ -223,12 +228,6 @@ onMounted(() => {
             <div>
               <h3 class="text-lg font-semibold mb-2">Subir Documento PDF</h3>
               <input type="file" accept=".pdf" @change="handleDocumentFileSelect" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
-              <input type="text" v-model="userUuid" placeholder="UUID de usuario" class="mt-2 block" />
-              <input type="text" v-model="signature" placeholder="Firma" class="mt-2 block" />
-              <select v-model="hashAlgorithm" class="mt-2 block">
-                <option value="SHA256">SHA256</option>
-                <option value="SHA512">SHA512</option>
-              </select>
               <button @click="handleUploadDocument" class="mt-2 bg-blue-600 text-white px-4 py-2 rounded">Subir Documento</button>
               <p v-if="documentStatus" class="mt-2" :class="documentStatus.includes('exitosamente') ? 'text-green-600' : 'text-red-600'">{{ documentStatus }}</p>
             </div>
@@ -305,9 +304,19 @@ onMounted(() => {
                     </svg>
                   </div>
                   <div class="ml-3 flex-1">
-                    <p class="text-sm font-medium text-gray-900 truncate">{{ doc.name }}</p>
-                    <p class="text-sm text-gray-500">{{ doc.uploadDate }}</p>
+                    <p class="text-sm font-medium text-gray-900 truncate">{{ doc.fileName }}</p>
+                    <p class="text-sm text-gray-500">{{ new Date(doc.uploadedAt).toLocaleString() }}</p>
                   </div>
+                  <button @click="handleDownloadDocument(doc)" class="ml-4 text-gray-400 hover:text-blue-600" title="Descargar">
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                  </button>
+                  <button @click="handleDeleteDocument(doc.id)" class="ml-2 text-gray-400 hover:text-red-600" title="Eliminar">
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
                 </div>
               </div>
             </div>
@@ -348,9 +357,19 @@ onMounted(() => {
                     </svg>
                   </div>
                   <div class="ml-3 flex-1">
-                    <p class="text-sm font-medium text-gray-900 truncate">{{ cert.name }}</p>
-                    <p class="text-sm text-gray-500">{{ cert.uploadDate }}</p>
+                    <p class="text-sm font-medium text-gray-900 truncate">{{ cert.filename }}</p>
+                    <p class="text-sm text-gray-500">{{ new Date(cert.createdAt).toLocaleString() }}</p>
                   </div>
+                  <button @click="handleDownloadCertificate(cert)" class="ml-4 text-gray-400 hover:text-blue-600" title="Descargar">
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                  </button>
+                  <button @click="handleDeleteCertificate(cert.id)" class="ml-2 text-gray-400 hover:text-red-600" title="Eliminar">
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
                 </div>
               </div>
             </div>

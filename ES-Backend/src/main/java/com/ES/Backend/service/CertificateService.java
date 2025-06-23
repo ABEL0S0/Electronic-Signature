@@ -2,6 +2,8 @@ package com.ES.Backend.service;
 
 import java.security.SecureRandom;
 import java.util.Base64;
+import java.util.List;
+import java.util.Optional;
 
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
@@ -31,7 +33,7 @@ public class CertificateService {
         byte[] encrypted = cryptoService.cipher(Cipher.ENCRYPT_MODE, key, iv).doFinal(file.getBytes());
 
         Certificate entity = new Certificate();
-        entity.setUserUUID(user);
+        entity.setuser(user);
         entity.setFilename(file.getOriginalFilename());
         entity.setData(encrypted);
         entity.setSaltHex(Base64.getEncoder().encodeToString(salt));
@@ -48,7 +50,7 @@ public class CertificateService {
         Certificate entity = repository.findById(id)
             .orElseThrow(() -> new IllegalArgumentException("Certificado no encontrado"));
 
-        System.out.println("Found certificate: " + entity.getFilename() + " for user: " + entity.getUserUUID());
+        System.out.println("Found certificate: " + entity.getFilename() + " for user: " + entity.getuser());
 
         try {
             byte[] salt = Base64.getDecoder().decode(entity.getSaltHex());
@@ -71,5 +73,21 @@ public class CertificateService {
             System.err.println("Data length: " + entity.getData().length);
             throw e;
         }
+    }
+
+    public List<Certificate> getCertificatesByUser(String user) {
+        return repository.findByuser(user);
+    }
+
+    public void deleteCertificatesByUser(String user) {
+        repository.deleteByuser(user);
+    }
+
+    public Optional<Certificate> getCertificateById(String id) {
+        return repository.findById(id);
+    }
+    
+    public void deleteCertificate(String id) {
+        repository.deleteById(id);
     }
 }

@@ -8,7 +8,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 public class Certificate {
     @Id
     private String id;
-    private String userUUID;
+    private String user;
     private String filename;
     private byte[] data;        // certificado cifrado
     private String saltHex;     // salt PBKDF2
@@ -18,10 +18,10 @@ public class Certificate {
     public Certificate() {
     }
 
-    public Certificate(String id, String userUUID, String filename, byte[] data, String saltHex, String ivHex,
+    public Certificate(String id, String user, String filename, byte[] data, String saltHex, String ivHex,
             Instant createdAt) {
         this.id = id;
-        this.userUUID = userUUID;
+        this.user = user;
         this.filename = filename;
         this.data = data;
         this.saltHex = saltHex;
@@ -37,12 +37,12 @@ public class Certificate {
         this.id = id;
     }
 
-    public String getUserUUID() {
-        return userUUID;
+    public String getuser() {
+        return user;
     }
 
-    public void setUserUUID(String userUUID) {
-        this.userUUID = userUUID;
+    public void setuser(String user) {
+        this.user = user;
     }
 
     public String getFilename() {

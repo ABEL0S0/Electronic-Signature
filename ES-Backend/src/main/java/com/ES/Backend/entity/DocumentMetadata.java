@@ -10,22 +10,18 @@ public class DocumentMetadata {
 
     @Id
     private String id;
-    private String userUuid;
+    private String user;
     private String fileName;
     private String filePath;
-    private String signature;
-    private String hashAlgorithm;
     private LocalDateTime uploadedAt;
 
     public DocumentMetadata() {
     }
 
-    public DocumentMetadata(String userUuid, String fileName, String filePath, String signature, String hashAlgorithm) {
-        this.userUuid = userUuid;
+    public DocumentMetadata(String user, String fileName, String filePath) {
+        this.user = user;
         this.fileName = fileName;
         this.filePath = filePath;
-        this.signature = signature;
-        this.hashAlgorithm = hashAlgorithm;
         this.uploadedAt = LocalDateTime.now();
     }
 
@@ -37,12 +33,12 @@ public class DocumentMetadata {
         this.id = id;
     }
 
-    public String getUserUuid() {
-        return userUuid;
+    public String getuser() {
+        return user;
     }
 
-    public void setUserUuid(String userUuid) {
-        this.userUuid = userUuid;
+    public void setuser(String user) {
+        this.user = user;
     }
 
     public String getFileName() {
@@ -59,22 +55,6 @@ public class DocumentMetadata {
 
     public void setFilePath(String filePath) {
         this.filePath = filePath;
-    }
-
-    public String getSignature() {
-        return signature;
-    }
-
-    public void setSignature(String signature) {
-        this.signature = signature;
-    }
-
-    public String getHashAlgorithm() {
-        return hashAlgorithm;
-    }
-
-    public void setHashAlgorithm(String hashAlgorithm) {
-        this.hashAlgorithm = hashAlgorithm;
     }
 
     public LocalDateTime getUploadedAt() {

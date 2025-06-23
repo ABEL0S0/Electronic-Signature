@@ -9,6 +9,7 @@ import java.util.List;
 
 @Repository
 public interface DocumentMetadataRepository extends MongoRepository<DocumentMetadata, String> {
-    List<DocumentMetadata> findByUserUuid(String userUuid);
+    List<DocumentMetadata> findByuser(String user);
+    void deleteByuser(String user);
 }
 
