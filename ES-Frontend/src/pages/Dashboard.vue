@@ -1,54 +1,66 @@
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, onMounted, watch } from "vue";
+import axios from "axios";
 import { authService, authState } from "../service/Auth";
-import { uploadDocument, uploadCertificate, getDocumentsByUser, getCertificatesByUser, deleteDocument, deleteCertificate, downloadDocument, downloadCertificate } from "../utils/api";
+import {
+  uploadDocument,
+  uploadCertificate,
+  getDocumentsByUser,
+  getCertificatesByUser,
+  deleteDocument,
+  deleteCertificate,
+  downloadDocument,
+  downloadCertificate
+} from "../utils/api";
 
-// Reactive data
-const documents = ref([]);
-const certificates = ref([]);
-const activeTab = ref("upload"); // upload, sign, documents
-
-// Get user info
+// —– Tabs y usuario —–
+const activeTab = ref("upload");      // upload, sign, documents
 const currentUser = authState.user;
-const userName = currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : "Usuario";
+const userName = currentUser
+  ? `${currentUser.firstName} ${currentUser.lastName}`
+  : "Usuario";
+const userEmail = ref(currentUser?.email || "");
 
-// Documento
-const documentFile = ref(null);
+// —– Listas globales —–
+const documents   = ref([]);
+const certificates = ref([]);
+
+// —– Archivos PDF para firmar y su vista —–
+const docsToSign  = ref([]);
+const pdfBlobUrl  = ref(null);
+
+// —– Subida de archivos —–
+const documentFile   = ref(null);
 const documentStatus = ref("");
-const user = ref(authState.user?.email || "");
-
-// Certificado
-const certificateFile = ref(null);
+const certificateFile     = ref(null);
 const certificatePassword = ref("");
-const certificateStatus = ref("");
+const certificateStatus   = ref("");
 
-function handleSignOut() {
-  // Clear authentication data
-  authService.clearAuth();
-
-  // Redirect to login page
-  window.location.hash = "/";
+// —– Helpers —–
+function getToken() {
+  return localStorage.getItem("token");
 }
 
+// —– Carga inicial —–
 async function loadUserFiles() {
-  if (!user.value) return;
+  if (!userEmail.value) return;
   try {
-    const [docsResponse, certsResponse] = await Promise.all([
+    const [docsRes, certsRes] = await Promise.all([
       getDocumentsByUser(),
-      getCertificatesByUser(user.value)
+      getCertificatesByUser(userEmail.value)
     ]);
-    documents.value = docsResponse.data;
-    certificates.value = certsResponse.data;
-  } catch (error) {
-    console.error("Error loading documents or certificates:", error);
+    documents.value    = docsRes.data;
+    certificates.value = certsRes.data;
+  } catch (e) {
+    console.error("Error cargando archivos:", e);
   }
 }
 
-function handleDocumentFileSelect(event) {
-  documentFile.value = event.target.files[0];
+// —– Upload Document —–
+function handleDocumentFileSelect(e) {
+  documentFile.value = e.target.files[0];
   documentStatus.value = "";
 }
-
 async function handleUploadDocument() {
   if (!documentFile.value) {
     documentStatus.value = "Selecciona un archivo";
@@ -59,17 +71,17 @@ async function handleUploadDocument() {
     await uploadDocument(documentFile.value);
     documentStatus.value = "Documento subido exitosamente";
     documentFile.value = null;
-    loadUserFiles();
-  } catch (e) {
+    await loadUserFiles();
+  } catch {
     documentStatus.value = "Error al subir el documento";
   }
 }
 
-function handleCertificateFileSelect(event) {
-  certificateFile.value = event.target.files[0];
+// —– Upload Certificate —–
+function handleCertificateFileSelect(e) {
+  certificateFile.value = e.target.files[0];
   certificateStatus.value = "";
 }
-
 async function handleUploadCertificate() {
   if (!certificateFile.value || !certificatePassword.value) {
     certificateStatus.value = "Completa todos los campos";
@@ -81,73 +93,105 @@ async function handleUploadCertificate() {
     certificateStatus.value = "Certificado subido exitosamente";
     certificateFile.value = null;
     certificatePassword.value = "";
-    loadUserFiles();
-  } catch (e) {
+    await loadUserFiles();
+  } catch {
     certificateStatus.value = "Error al subir el certificado";
   }
 }
 
-async function handleDeleteDocument(docId) {
-  if (!confirm("¿Estás seguro de que quieres eliminar este documento?")) return;
-  try {
-    await deleteDocument(docId);
-    loadUserFiles();
-  } catch (error) {
-    console.error("Error deleting document:", error);
-    alert("Error al eliminar el documento.");
-  }
-}
-
-async function handleDeleteCertificate(certId) {
-  if (!confirm("¿Estás seguro de que quieres eliminar este certificado?")) return;
-  try {
-    await deleteCertificate(certId);
-    loadUserFiles();
-  } catch (error) {
-    console.error("Error deleting certificate:", error);
-    alert("Error al eliminar el certificado.");
-  }
-}
-
+// —– Descargar y eliminar Document —–
 async function handleDownloadDocument(doc) {
   try {
-    const response = await downloadDocument(doc.id);
-    const blob = new Blob([response.data], { type: response.headers['content-type'] });
-    const link = document.createElement('a');
-    link.href = window.URL.createObjectURL(blob);
+    const res = await downloadDocument(doc.id);
+    const blob = new Blob([res.data], { type: res.headers["content-type"] });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
     link.download = doc.fileName;
-    document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
-  } catch (error) {
-    console.error("Error downloading document:", error);
-    alert("Error al descargar el documento.");
+  } catch {
+    alert("Error al descargar documento.");
   }
 }
-
-async function handleDownloadCertificate(cert) {
-  const password = prompt("Introduce la contraseña del certificado:");
-  if (!password) {
-    alert("La contraseña es obligatoria para descargar el certificado.");
-    return;
-  }
+async function handleDeleteDocument(id) {
+  if (!confirm("¿Eliminar documento?")) return;
   try {
-    const response = await downloadCertificate(cert.id, password);
-    const blob = new Blob([response.data], { type: 'application/octet-stream' });
-    const link = document.createElement('a');
-    link.href = window.URL.createObjectURL(blob);
-    link.download = cert.filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  } catch (error) {
-    console.error("Error downloading certificate:", error);
-    alert("Error al descargar el certificado. Verifica la contraseña.");
+    await deleteDocument(id);
+    await loadUserFiles();
+    pdfBlobUrl.value = null;
+  } catch {
+    alert("Error al eliminar documento.");
   }
 }
 
+// —– Descargar y eliminar Certificate —–
+async function handleDownloadCertificate(cert) {
+  const pwd = prompt("Introduce contraseña:");
+  if (!pwd) return alert("Contraseña obligatoria.");
+  try {
+    const res = await downloadCertificate(cert.id, pwd);
+    const blob = new Blob([res.data], { type: "application/octet-stream" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = cert.filename;
+    link.click();
+  } catch {
+    alert("Error al descargar certificado.");
+  }
+}
+async function handleDeleteCertificate(id) {
+  if (!confirm("¿Eliminar certificado?")) return;
+  try {
+    await deleteCertificate(id);
+    await loadUserFiles();
+  } catch {
+    alert("Error al eliminar certificado.");
+  }
+}
+
+// —– Lista para firmar —–
+async function fetchDocsToSign() {
+  try {
+    const res = await axios.get("/api/documents/list", {
+      headers: { Authorization: `Bearer ${getToken()}` }
+    });
+    docsToSign.value = res.data;
+  } catch (e) {
+    console.error("Error cargando docs para firmar:", e);
+  }
+}
+
+// —– Ver PDF autenticado con Blob —–
+async function viewDocument(id) {
+  try {
+    if (pdfBlobUrl.value) {
+      URL.revokeObjectURL(pdfBlobUrl.value);
+      pdfBlobUrl.value = null;
+    }
+    const res = await axios.get(`/api/documents/${id}/view`, {
+      headers: { Authorization: `Bearer ${getToken()}` },
+      responseType: "blob"
+    });
+    pdfBlobUrl.value = URL.createObjectURL(res.data);
+    activeTab.value = "sign";
+  } catch (e) {
+    console.error("Error al cargar PDF:", e);
+    alert("No se pudo mostrar el documento.");
+  }
+}
+
+// —– Logout —–
+function handleSignOut() {
+  authService.clearAuth();
+  window.location.hash = "/";
+}
+
+// —– Ciclo de vida —–
 onMounted(() => {
   loadUserFiles();
+  if (activeTab.value === "sign") fetchDocsToSign();
+});
+watch(activeTab, (tab) => {
+  if (tab === "sign") fetchDocsToSign();
 });
 </script>
 
@@ -243,29 +287,46 @@ onMounted(() => {
           </div>
         </div>
 
-        <!-- Sign Documents Tab -->
-        <div v-if="activeTab === 'sign'" class="bg-white shadow rounded-lg p-6">
-          <h2 class="text-xl font-semibold text-gray-900 mb-4">Firmar Documentos</h2>
-          <div class="text-center py-12">
-            <svg
-              class="mx-auto h-12 w-12 text-gray-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-              />
-            </svg>
-            <h3 class="mt-2 text-sm font-medium text-gray-900">Funcionalidad en desarrollo</h3>
-            <p class="mt-1 text-sm text-gray-500">
-              La funcionalidad de firma de documentos estará disponible próximamente.
-            </p>
-          </div>
-        </div>
+            <!-- Sign Documents Tab -->
+<div v-if="activeTab === 'sign'" class="bg-white shadow rounded-lg p-6">
+  <h2 class="text-xl font-semibold text-gray-900 mb-4">Firmar Documentos</h2>
+
+  <!-- Mensaje si no hay documentos -->
+  <div v-if="docsToSign.length === 0" class="text-center py-12">
+    <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0
+               012-2h5.586a1 1 0 01.707.293l5.414
+               5.414a1 1 0 01.293.707V19a2 2 0
+               01-2 2z"/>
+    </svg>
+    <h3 class="mt-2 text-sm font-medium text-gray-900">No tienes documentos para firmar.</h3>
+  </div>
+
+  <!-- Lista y visor -->
+  <div v-else class="grid md:grid-cols-2 gap-6">
+    <!-- Lista de documentos -->
+    <ul class="space-y-2">
+      <li v-for="doc in docsToSign" :key="doc.id">
+        <!-- cambiamos button por un enlace que llama a viewDocument -->
+        <a href="#"
+           @click.prevent="viewDocument(doc.id)"
+           class="text-blue-600 hover:underline">
+          {{ doc.fileName }}
+        </a>
+      </li>
+    </ul>
+
+    <!-- Visor PDF vía Blob-URL -->
+    <div v-if="pdfBlobUrl" class="border rounded overflow-hidden">
+      <iframe
+        :src="pdfBlobUrl"
+        class="w-full h-96"
+        frameborder="0"
+      ></iframe>
+    </div>
+  </div>
+</div>
 
         <!-- My Documents Tab -->
         <div v-if="activeTab === 'documents'" class="space-y-6">

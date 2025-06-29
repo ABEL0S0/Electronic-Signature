@@ -1,8 +1,13 @@
 package com.ES.Backend.service;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
+
 
 import com.ES.Backend.entity.DocumentMetadata;
 import com.ES.Backend.repository.DocumentMetadataRepository;
@@ -77,4 +82,26 @@ public class DocumentMetadataService {
             .orElseThrow(() -> new RuntimeException("Documento no encontrado"));
         return metadata;
     }
+
+    public Resource loadPdfById(String id) {
+        DocumentMetadata metadata = repository.findById(id)
+            .orElseThrow(() -> new ResponseStatusException(
+                HttpStatus.NOT_FOUND,
+                "Documento no encontrado con ID: " + id));
+
+        Path filePath = Paths.get(metadata.getFilePath())
+                             .toAbsolutePath()
+                             .normalize();
+
+        Resource resource = new FileSystemResource(filePath.toFile());
+        if (!resource.exists() || !resource.isReadable()) {
+            throw new ResponseStatusException(
+                HttpStatus.NOT_FOUND,
+                "No se puede leer el archivo PDF: " + metadata.getFileName());
+        }
+
+        return resource;
+    }
+
+       
 }
