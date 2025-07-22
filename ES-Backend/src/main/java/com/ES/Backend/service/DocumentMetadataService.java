@@ -101,7 +101,5 @@ public class DocumentMetadataService {
         }
 
         return resource;
-    }
-
-       
+    }    
 }

@@ -36,6 +36,16 @@ const certificateFile     = ref(null);
 const certificatePassword = ref("");
 const certificateStatus   = ref("");
 
+// —– Crear Firma —–
+const form = ref({
+  nombre: "",
+  correo: "",
+  organizacion: "",
+  password: "",
+  opcion: "descargar",
+});
+const certStatus = ref("");
+
 // —– Helpers —–
 function getToken() {
   return localStorage.getItem("token");
@@ -179,6 +189,39 @@ async function viewDocument(id) {
   }
 }
 
+// —– Crear certificado —–
+async function solicitarCertificado() {
+  certStatus.value = "";
+  try {
+    const res = await fetch("/api/certificates/request", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${getToken()}`,
+      },
+      body: JSON.stringify(form.value),
+    });
+
+    if (!res.ok) throw new Error("Error al generar el certificado");
+
+    if (form.value.opcion === "descargar") {
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "firma_electronica.p12";
+      a.click();
+      URL.revokeObjectURL(url);
+      certStatus.value = "Certificado generado y descargado correctamente";
+    } else {
+      const data = await res.json();
+      certStatus.value = data.message || "Certificado guardado correctamente";
+    }
+  } catch (err) {
+    certStatus.value = "Hubo un error: " + err.message;
+  }
+}
+
 // —– Logout —–
 function handleSignOut() {
   authService.clearAuth();
@@ -256,6 +299,17 @@ watch(activeTab, (tab) => {
               ]"
             >
               Mis Documentos
+            </button>
+            <button
+              @click="activeTab = 'request'"
+              :class="[
+                'px-3 py-2 rounded-md text-sm font-medium',
+                activeTab === 'request'
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'text-gray-500 hover:text-gray-700'
+              ]"
+            >
+              Solicitar Firma
             </button>
           </nav>
         </div>
@@ -436,6 +490,24 @@ watch(activeTab, (tab) => {
             </div>
           </div>
         </div>
+
+        <div v-if="activeTab === 'request'" class="bg-white shadow rounded-lg p-6">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">Solicitar Firma Electrónica</h2>
+            <form @submit.prevent="solicitarCertificado" class="space-y-4">
+              <input v-model="form.nombre" placeholder="Nombre completo" required class="block w-full" />
+              <input v-model="form.correo" placeholder="Correo electrónico" type="email" required class="block w-full" />
+              <input v-model="form.organizacion" placeholder="Organización (opcional)" class="block w-full" />
+              <input v-model="form.password" type="password" placeholder="Contraseña para .p12" required class="block w-full" />
+              <label>¿Qué deseas hacer con tu certificado?</label>
+              <select v-model="form.opcion" class="block w-full">
+                <option value="descargar">Descargar</option>
+                <option value="guardar">Guardar en el sistema</option>
+              </select>
+              <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded">Solicitar</button>
+              <p v-if="certStatus" :class="certStatus.includes('correctamente') ? 'text-green-600' : 'text-red-600'">{{ certStatus }}</p>
+            </form>
+          </div>
+
       </div>
     </main>
   </div>

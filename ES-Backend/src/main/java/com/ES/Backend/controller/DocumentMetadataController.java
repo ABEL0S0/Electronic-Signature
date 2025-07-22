@@ -122,7 +122,4 @@ public class DocumentMetadataController {
             .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + pdf.getFilename() + "\"")
             .body(pdf);
     }
-
-    
 }
-
