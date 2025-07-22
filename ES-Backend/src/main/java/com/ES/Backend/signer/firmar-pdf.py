@@ -1,42 +1,54 @@
+import os
 import sys
 import traceback
 
 from pyhanko.sign import signers
-from pyhanko.stamp import TextStampStyle  # Puedes cambiar a QRStampStyle si deseas
-from pyhanko.sign.fields import SigFieldSpec
 from pyhanko.sign.signers.pdf_signer import PdfSigner, PdfSignatureMetadata
-from pyhanko_certvalidator import ValidationContext
-from pyhanko.sign.validation import validate_pdf_signature
+from pyhanko.sign.fields import SigFieldSpec
+from pyhanko.stamp import QRStampStyle
 from pyhanko.pdf_utils.incremental_writer import IncrementalPdfFileWriter
 
-print("[firmar-pdf.py] Script iniciado.")
+def firmar_pdf(cert_path, cert_password, pdf_input, pdf_output,
+               page, x1, y1, x2, y2):
+    print(f">> firmar_pdf: cert={cert_path}")
+    print(">> Tamaño .p12:", os.path.getsize(cert_path), "bytes")
 
-def firmar_pdf(cert_path, cert_password, pdf_input, pdf_output, page, x1, y1, x2, y2):
-    print(f"[firmar-pdf.py] firmar_pdf() llamado con:\n  cert_path={cert_path}\n  pdf_input={pdf_input}\n  pdf_output={pdf_output}\n  page={page}, x1={x1}, y1={y1}, x2={x2}, y2={y2}")
+    ca_cert = os.path.join(os.path.dirname(cert_path), "ca-cert.pem")
+    print(f">> CA PEM: {ca_cert} (existe? {os.path.exists(ca_cert)})")
 
     try:
-        signer = signers.SimpleSigner.load_pkcs12(cert_path, cert_password.encode())
-        print("[firmar-pdf.py] Certificado cargado correctamente.")
+        signer = signers.SimpleSigner.load_pkcs12(
+            pfx_file=cert_path,
+            ca_chain_files=[ca_cert],
+            passphrase=cert_password.encode()
+        )
+        print(">> SimpleSigner.load_pkcs12: OK")
     except Exception as e:
-        print(f"[firmar-pdf.py] Error cargando certificado: {e}")
+        print(">> ERROR cargando P12:", e)
         traceback.print_exc()
-        raise
+        sys.exit(1)
 
-    # Estilo visible del sello (puede cambiarse por QRStampStyle si se prefiere)
-    style = TextStampStyle(stamp_text="Firmado digitalmente por {signer}", background=None)
+    # --- EXTRAEMOS DATOS PARA EL QR ---
+    cert = signer.signing_cert
+    subj = getattr(cert.subject, 'native', {})
+    cn    = subj.get("common_name", "")
+    email = subj.get("email_address", "")
+    org   = subj.get("organization_name", "")
+    qr_data = f"Name: {cn}\nEmail: {email}\nOrganization: {org}"
+    print(">> QR data:", repr(qr_data))
+
+    # Creamos el estilo QR (sin payload)
+    style = QRStampStyle()
 
     try:
         with open(pdf_input, "rb") as inf, open(pdf_output, "wb") as outf:
             w = IncrementalPdfFileWriter(inf)
+            print(">> PDF entrada:", pdf_input, "tamaño:", os.path.getsize(pdf_input), "bytes")
 
-            # Verificar si el campo de firma ya existe
-            #if w.find_sig_field("Sig1") is not None:
-            #    print("[firmar-pdf.py] El campo de firma 'Sig1' ya existe en el PDF. Elige otro nombre o elimina el campo existente.")
-            #    return
-
+            # Sólo metadata básica aquí
             meta = PdfSignatureMetadata(field_name="Sig1")
 
-            signer_obj = PdfSigner(
+            pdf_signer = PdfSigner(
                 signature_meta=meta,
                 signer=signer,
                 stamp_style=style,
@@ -47,38 +59,27 @@ def firmar_pdf(cert_path, cert_password, pdf_input, pdf_output, page, x1, y1, x2
                 )
             )
 
-            # Quitar with_validation_context, no es necesario
-            # vc = ValidationContext(allow_fetching=True)
-            # signer_obj = with_validation_context(signer_obj, vc)
+            # Pasamos el QR payload como 'url' en appearance_text_params
+            pdf_signer.sign_pdf(
+                w, output=outf,
+                appearance_text_params={"url": qr_data}
+            )
 
-            signer_obj.sign_pdf(w, output=outf)
-            print("[firmar-pdf.py] PDF firmado correctamente.")
-
-    except Exception as e:
-        print(f"[firmar-pdf.py] Error firmando PDF: {e}")
-        traceback.print_exc()
-        raise
-
-def verificar_pdf(pdf_output):
-    print(f"[firmar-pdf.py] Verificando firma de: {pdf_output}")
-    try:
+        print(">> PDF firmado escrito:", pdf_output, "tamaño:", os.path.getsize(pdf_output), "bytes")
         with open(pdf_output, "rb") as f:
-            result = validate_pdf_signature(f, "Sig1", ValidationContext(allow_fetching=True))
-            print("[firmar-pdf.py] Resultado de validación:")
-            print(result.pretty_print_details())
+            print(">> Cabecera firmada:", f.read(8))
+
     except Exception as e:
-        print(f"[firmar-pdf.py] Error validando PDF: {e}")
+        print(">> ERROR firmando PDF:", e)
         traceback.print_exc()
+        sys.exit(1)
+
 
 if __name__ == "__main__":
-    print(f"[firmar-pdf.py] Argumentos recibidos: {sys.argv}")
     if len(sys.argv) != 10:
         print("Uso: python firmar-pdf.py cert.p12 password input.pdf output.pdf page x1 y1 x2 y2")
         sys.exit(1)
-
-    try:
-        firmar_pdf(*sys.argv[1:])
-        verificar_pdf(sys.argv[4])
-    except Exception:
-        print("[firmar-pdf.py] Falló la firma o verificación del PDF.")
-        sys.exit(1)
+    _, cert_path, cert_password, pdf_input, pdf_output, page, x1, y1, x2, y2 = sys.argv
+    firmar_pdf(cert_path, cert_password, pdf_input, pdf_output, page, x1, y1, x2, y2)
+    print(">> Exit OK")
+    sys.exit(0)

@@ -148,7 +148,29 @@ public class CertificateService {
     // Implementa generateUserCertificate usando BouncyCastle para firmar con tu CA
     public X509Certificate generateUserCertificate(String nombre, String correo, String organizacion, PublicKey userPublicKey) throws Exception {
         Security.addProvider(new BouncyCastleProvider());
-    
+
+        // Exportar la CA a archivos PEM en files/uploads/tmp
+        try {
+            java.io.File tmpDir = new java.io.File("files/uploads/tmp");
+            if (!tmpDir.exists()) {
+                tmpDir.mkdirs();
+            }
+            // Guardar el certificado de la CA
+            java.io.File caCertFile = new java.io.File(tmpDir, "ca-cert.pem");
+            try (java.io.FileWriter fw = new java.io.FileWriter(caCertFile);
+                 org.bouncycastle.openssl.jcajce.JcaPEMWriter pemWriter = new org.bouncycastle.openssl.jcajce.JcaPEMWriter(fw)) {
+                pemWriter.writeObject(this.caCertificate);
+            }
+            // Guardar la clave privada de la CA
+            java.io.File caKeyFile = new java.io.File(tmpDir, "ca-key.pem");
+            try (java.io.FileWriter fw = new java.io.FileWriter(caKeyFile);
+                 org.bouncycastle.openssl.jcajce.JcaPEMWriter pemWriter = new org.bouncycastle.openssl.jcajce.JcaPEMWriter(fw)) {
+                pemWriter.writeObject(this.caPrivateKey);
+            }
+        } catch (Exception e) {
+            System.err.println("Error exportando la CA: " + e.getMessage());
+        }
+
         // Ordenar el subject y el issuer para que coincidan exactamente
         String caEmail = "electronic.signature@gmail.com";
         String caDn = "emailAddress=" + caEmail + ", CN=ESI, OU=E-S, O=E-Signature, L=Esmeraldas, ST=Esmeraldas, C=EC";
@@ -163,7 +185,7 @@ public class CertificateService {
         subjectDn.append(", ST=Esmeraldas");
         subjectDn.append(", C=EC");
         X500Name subject = new X500Name(subjectDn.toString());
-    
+
         BigInteger serial = BigInteger.valueOf(System.currentTimeMillis());
         Date notBefore = new Date();
         Date notAfter = new Date(notBefore.getTime() + (365L * 24 * 60 * 60 * 1000L)); // 1 año
@@ -186,7 +208,7 @@ public class CertificateService {
         
         ContentSigner signer = new JcaContentSignerBuilder("SHA256WithRSA").setProvider("BC").build(caPrivateKey);
         X509CertificateHolder certHolder = certBuilder.build(signer);
-    
+
         X509Certificate cert = new JcaX509CertificateConverter().setProvider("BC").getCertificate(certHolder);
 
         // Imprimir información del certificado generado para depuración
