@@ -13,15 +13,17 @@ public class DocumentMetadata {
     private String user;
     private String fileName;
     private String filePath;
+    private boolean isSigned = false;
     private LocalDateTime uploadedAt;
 
     public DocumentMetadata() {
     }
 
-    public DocumentMetadata(String user, String fileName, String filePath) {
+    public DocumentMetadata(String user, String fileName, String filePath, boolean isSigned ) {
         this.user = user;
         this.fileName = fileName;
         this.filePath = filePath;
+        this.isSigned = isSigned;
         this.uploadedAt = LocalDateTime.now();
     }
 
@@ -55,6 +57,14 @@ public class DocumentMetadata {
 
     public void setFilePath(String filePath) {
         this.filePath = filePath;
+    }
+
+    public boolean isSigned() {
+        return isSigned;
+    }
+
+    public void setSigned(boolean isSigned) {
+        this.isSigned = isSigned;
     }
 
     public LocalDateTime getUploadedAt() {

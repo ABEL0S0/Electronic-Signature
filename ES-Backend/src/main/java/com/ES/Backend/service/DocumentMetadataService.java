@@ -102,4 +102,8 @@ public class DocumentMetadataService {
 
         return resource;
     }    
+
+    public void updateDocument(DocumentMetadata metadata) {
+        repository.save(metadata);
+    }
 }

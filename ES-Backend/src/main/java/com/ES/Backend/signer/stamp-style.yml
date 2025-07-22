@@ -1,0 +1,15 @@
+stamp-style:
+  background:
+    image: firma.png
+    scale: fit
+  text-box:
+    text: |
+      Firmado electrónicamente por: {{signer.name}}
+      Fecha: {{timestamp}}
+    font-size: 8
+    font: Helvetica
+    border: false
+    margin-left: 5
+    margin-top: 5
+    max-width: 200
+    max-height: 50

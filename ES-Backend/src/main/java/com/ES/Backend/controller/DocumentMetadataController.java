@@ -1,6 +1,8 @@
 package com.ES.Backend.controller;
 
+import com.ES.Backend.entity.Certificate;
 import com.ES.Backend.entity.DocumentMetadata;
+import com.ES.Backend.service.CertificateService;
 import com.ES.Backend.service.DocumentMetadataService;
 import com.ES.Backend.service.JwtService;
 
@@ -9,6 +11,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 import org.springframework.http.MediaType;
@@ -18,23 +21,28 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RequestMapping;
 
-
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/documents")
 public class DocumentMetadataController {
 
+    @Value("${tmp.path}")
+    private String tmpPath;
+
     private final DocumentMetadataService service;
+    private final CertificateService certificateService;
     private final JwtService jwtService;
 
-    public DocumentMetadataController(DocumentMetadataService service, JwtService jwtService) {
+    public DocumentMetadataController(DocumentMetadataService service, JwtService jwtService, CertificateService certificateService) {
         this.service = service;
         this.jwtService = jwtService;
+        this.certificateService = certificateService;
     }
 
     @PostMapping("/upload")
@@ -121,5 +129,93 @@ public class DocumentMetadataController {
             .contentType(MediaType.APPLICATION_PDF)
             .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + pdf.getFilename() + "\"")
             .body(pdf);
+    }
+
+    @PostMapping("/sign/{id}")
+    public ResponseEntity<?> signDocument(
+        @RequestHeader(HttpHeaders.AUTHORIZATION) String authHeader,
+        @PathVariable String id,
+        @RequestParam int page,
+        @RequestParam float x,
+        @RequestParam float y,
+        @RequestParam String certificateId,
+        @RequestParam String certPassword // o como lo manejes
+    ) {
+        try {
+            System.out.println("[signDocument] Iniciando firma de documento. ID: " + id + ", CertID: " + certificateId);
+            String token = authHeader.substring(7);
+            String user = jwtService.extractUser(token);
+            System.out.println("[signDocument] Usuario extraído del token: " + user);
+
+            // 1. Obtener metadata y verificar usuario
+            DocumentMetadata metadata = service.downloadDocument(id);
+            System.out.println("[signDocument] Metadata obtenida: " + metadata.getFileName());
+            if (!metadata.getuser().equals(user)) {
+                System.out.println("[signDocument] Usuario no autorizado para este documento.");
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("No autorizado");
+            }
+
+            // 2. Obtener el certificado de la base de datos
+            Optional<Certificate> certOpt = certificateService.getCertificateById(certificateId);
+            if (certOpt.isEmpty()) {
+                System.out.println("[signDocument] Certificado no encontrado en la base de datos.");
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Certificado no encontrado");
+            }
+            Certificate certEntity = certOpt.get();
+            System.out.println("[signDocument] Certificado encontrado: " + certEntity.getFilename());
+
+            // 3. Descifrar el .p12
+            byte[] p12Bytes = certificateService.decrypt(certificateId, certPassword.toCharArray());
+            System.out.println("[signDocument] Certificado descifrado, tamaño: " + p12Bytes.length + " bytes");
+            String rootPath = Paths.get("files").toAbsolutePath().toString();
+            String tempP12Path = rootPath + java.io.File.separator + tmpPath + java.io.File.separator + user + "_temp.p12";
+            System.out.println("[signDocument] Ruta temporal para .p12: " + tempP12Path);
+            java.nio.file.Files.write(java.nio.file.Paths.get(tempP12Path), p12Bytes);
+
+            String pdfInput = metadata.getFilePath();
+            String pdfOutput = pdfInput.replace(".pdf", "_signed.pdf");
+            String stylePath = "src/main/java/com/ES/Backend/signer/stamp-style.yml";
+            System.out.println("[signDocument] PDF de entrada: " + pdfInput);
+            System.out.println("[signDocument] PDF de salida: " + pdfOutput);
+            //System.out.println("[signDocument] Style YAML: " + stylePath);
+
+            // 4. Ejecutar script de Python
+            ProcessBuilder pb = new ProcessBuilder(
+                "python", "src/main/java/com/ES/Backend/signer/firmar-pdf.py",
+                tempP12Path, certPassword, pdfInput, pdfOutput,
+                String.valueOf(page), String.valueOf(x), String.valueOf(y),
+                String.valueOf(x+300), String.valueOf(y+100)
+            );
+            pb.redirectErrorStream(true);
+            System.out.println("[signDocument] Ejecutando script Python: " + pb.command());
+            Process process = pb.start();
+            java.io.InputStream is = process.getInputStream();
+            java.util.Scanner s = new java.util.Scanner(is).useDelimiter("\\A");
+            String output = s.hasNext() ? s.next() : "";
+            System.out.println("[signDocument] Salida del script Python:\n" + output);
+            int exitCode = process.waitFor();
+            System.out.println("[signDocument] Código de salida del script: " + exitCode);
+
+            // 5. Borrar el archivo temporal
+            java.nio.file.Files.deleteIfExists(java.nio.file.Paths.get(tempP12Path));
+            System.out.println("[signDocument] Archivo temporal eliminado: " + tempP12Path);
+
+            if (exitCode != 0) {
+                System.out.println("[signDocument] Error al firmar PDF");
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error al firmar PDF");
+            }
+
+            // 6. Actualizar metadata
+            metadata.setFilePath(pdfOutput);
+            metadata.setSigned(true);
+            service.updateDocument(metadata);
+            System.out.println("[signDocument] Documento firmado y metadata actualizada.");
+
+            return ResponseEntity.ok("Documento firmado correctamente");
+        } catch (Exception e) {
+            System.out.println("[signDocument] Excepción: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().body("Error: " + e.getMessage());
+        }
     }
 }

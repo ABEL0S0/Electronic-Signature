@@ -12,6 +12,7 @@ import {
   downloadDocument,
   downloadCertificate
 } from "../utils/api";
+import firmaImg from "../assets/firma.png";
 
 // —– Tabs y usuario —–
 const activeTab = ref("upload");      // upload, sign, documents
@@ -228,6 +229,50 @@ function handleSignOut() {
   window.location.hash = "/";
 }
 
+const signForm = ref({
+  documentId: null,
+  certificateId: null,
+  certPassword: "",
+  page: 0,
+  x: 100,
+  y: 100,
+});
+const signStatus = ref("");
+
+async function handleSignDocument() {
+  signStatus.value = "";
+  if (!signForm.value.documentId || !signForm.value.certificateId || !signForm.value.certPassword) {
+    signStatus.value = "Completa todos los campos";
+    return;
+  }
+  try {
+    const params = new URLSearchParams({
+      page: signForm.value.page,
+      x: signForm.value.x,
+      y: signForm.value.y,
+      certificateId: signForm.value.certificateId,
+      certPassword: signForm.value.certPassword,
+    });
+    const res = await axios.post(`/api/documents/sign/${signForm.value.documentId}?${params.toString()}`, {}, {
+      headers: { Authorization: `Bearer ${getToken()}` }
+    });
+    signStatus.value = res.data || "Documento firmado correctamente";
+    await loadUserFiles();
+    await fetchDocsToSign();
+  } catch (e) {
+    signStatus.value = e.response?.data || "Error al firmar documento";
+  }
+}
+
+function handlePdfClick(e) {
+  // Obtener la posición relativa al contenedor
+  const rect = e.currentTarget.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  signForm.value.x = Math.round(x);
+  signForm.value.y = Math.round(y);
+}
+
 // —– Ciclo de vida —–
 onMounted(() => {
   loadUserFiles();
@@ -341,46 +386,89 @@ watch(activeTab, (tab) => {
           </div>
         </div>
 
-            <!-- Sign Documents Tab -->
-<div v-if="activeTab === 'sign'" class="bg-white shadow rounded-lg p-6">
-  <h2 class="text-xl font-semibold text-gray-900 mb-4">Firmar Documentos</h2>
+        <!-- Sign Documents Tab -->
+        <div v-if="activeTab === 'sign'" class="bg-white shadow rounded-lg p-6">
+          <h2 class="text-xl font-semibold text-gray-900 mb-4">Firmar Documentos</h2>
 
-  <!-- Mensaje si no hay documentos -->
-  <div v-if="docsToSign.length === 0" class="text-center py-12">
-    <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0
-               012-2h5.586a1 1 0 01.707.293l5.414
-               5.414a1 1 0 01.293.707V19a2 2 0
-               01-2 2z"/>
-    </svg>
-    <h3 class="mt-2 text-sm font-medium text-gray-900">No tienes documentos para firmar.</h3>
-  </div>
+          <!-- Mensaje si no hay documentos -->
+          <div v-if="docsToSign.length === 0" class="text-center py-12">
+            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0
+                      012-2h5.586a1 1 0 01.707.293l5.414
+                      5.414a1 1 0 01.293.707V19a2 2 0
+                      01-2 2z"/>
+            </svg>
+            <h3 class="mt-2 text-sm font-medium text-gray-900">No tienes documentos para firmar.</h3>
+          </div>
 
-  <!-- Lista y visor -->
-  <div v-else class="grid md:grid-cols-2 gap-6">
-    <!-- Lista de documentos -->
-    <ul class="space-y-2">
-      <li v-for="doc in docsToSign" :key="doc.id">
-        <!-- cambiamos button por un enlace que llama a viewDocument -->
-        <a href="#"
-           @click.prevent="viewDocument(doc.id)"
-           class="text-blue-600 hover:underline">
-          {{ doc.fileName }}
-        </a>
-      </li>
-    </ul>
+          <!-- Lista y visor -->
+          <div v-else class="grid md:grid-cols-2 gap-6">
+            <!-- Lista de documentos -->
+            <ul class="space-y-2">
+              <li v-for="doc in docsToSign" :key="doc.id">
+                <a href="#"
+                  @click.prevent="() => { viewDocument(doc.id); signForm.documentId = doc.id; }"
+                  class="text-blue-600 hover:underline">
+                  {{ doc.fileName }}
+                </a>
+              </li>
+            </ul>
 
-    <!-- Visor PDF vía Blob-URL -->
-    <div v-if="pdfBlobUrl" class="border rounded overflow-hidden">
-      <iframe
-        :src="pdfBlobUrl"
-        class="w-full h-96"
-        frameborder="0"
-      ></iframe>
-    </div>
-  </div>
-</div>
+            <!-- Visor PDF vía Blob-URL y formulario de firma -->
+            <div v-if="pdfBlobUrl" class="border rounded overflow-hidden p-4">
+              <div
+                class="relative w-full h-96"
+                @click="handlePdfClick"
+                style="cursor: crosshair;"
+              >
+                <iframe
+                  ref="pdfFrame"
+                  :src="pdfBlobUrl"
+                  class="w-full h-96"
+                  frameborder="0"
+                  style="pointer-events: none; position: absolute; left: 0; top: 0;"
+                ></iframe>
+                <!-- Overlay para capturar clics -->
+                <div
+                  class="absolute top-0 left-0 w-full h-full"
+                  style="z-index: 2;"
+                ></div>
+                <!-- Imagen de la firma -->
+                <img
+                  v-if="signForm.x !== null && signForm.y !== null"
+                  :src="firmaImg"
+                  :style="{
+                    position: 'absolute',
+                    left: signForm.x + 'px',
+                    top: signForm.y + 'px',
+                    width: '120px',
+                    height: '60px',
+                    zIndex: 3
+                  }"
+                  alt="Firma"
+                />
+              </div>
+              <form @submit.prevent="handleSignDocument" class="space-y-2">
+                <label class="block font-medium">Selecciona certificado:</label>
+                <select v-model="signForm.certificateId" class="block w-full border rounded p-2">
+                  <option disabled value="">Selecciona un certificado</option>
+                  <option v-for="cert in certificates" :key="cert.id" :value="cert.id">
+                    {{ cert.filename }} ({{ new Date(cert.createdAt).toLocaleString() }})
+                  </option>
+                </select>
+                <input v-model="signForm.certPassword" type="password" placeholder="Contraseña del certificado" class="block w-full border rounded p-2" required />
+                <div class="flex space-x-2">
+                  <input v-model.number="signForm.page" type="number" min="0" placeholder="Página" class="w-1/3 border rounded p-2" required />
+                  <input v-model.number="signForm.x" type="number" min="0" placeholder="Posición X" class="w-1/3 border rounded p-2" required />
+                  <input v-model.number="signForm.y" type="number" min="0" placeholder="Posición Y" class="w-1/3 border rounded p-2" required />
+                </div>
+                <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded">Firmar Documento</button>
+                <p v-if="signStatus" :class="signStatus.includes('correctamente') ? 'text-green-600' : 'text-red-600'">{{ signStatus }}</p>
+              </form>
+            </div>
+          </div>
+        </div>
 
         <!-- My Documents Tab -->
         <div v-if="activeTab === 'documents'" class="space-y-6">
