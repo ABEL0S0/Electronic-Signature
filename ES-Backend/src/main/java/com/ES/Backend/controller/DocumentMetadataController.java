@@ -205,8 +205,23 @@ public class DocumentMetadataController {
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error al firmar PDF");
             }
 
-            // 6. Actualizar metadata
-            metadata.setFilePath(pdfOutput);
+            // 6. Reemplazar el archivo original por el firmado y actualizar metadata
+            try {
+                // Eliminar el original
+                java.nio.file.Files.deleteIfExists(java.nio.file.Paths.get(pdfInput));
+                // Renombrar el firmado al nombre original
+                java.nio.file.Files.move(
+                    java.nio.file.Paths.get(pdfOutput),
+                    java.nio.file.Paths.get(pdfInput)
+                );
+                System.out.println("[signDocument] Archivo firmado reemplazó al original: " + pdfInput);
+            } catch (Exception e) {
+                System.out.println("[signDocument] Error al reemplazar el archivo original: " + e.getMessage());
+                e.printStackTrace();
+                return ResponseEntity.internalServerError().body("Error al reemplazar el archivo original: " + e.getMessage());
+            }
+
+            metadata.setFilePath(pdfInput);
             metadata.setSigned(true);
             service.updateDocument(metadata);
             System.out.println("[signDocument] Documento firmado y metadata actualizada.");

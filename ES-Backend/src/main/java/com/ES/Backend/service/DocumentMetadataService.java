@@ -35,7 +35,7 @@ public class DocumentMetadataService {
 
     public DocumentMetadata saveDocument(MultipartFile file, String user) throws IOException {
         String rootPath = Paths.get("files").toAbsolutePath().toString();
-        String fileName = UUID.randomUUID() + "_" + file.getOriginalFilename();
+        String fileName = file.getOriginalFilename();
         String fullPath = rootPath + File.separator + uploadPath + File.separator + fileName;
 
 

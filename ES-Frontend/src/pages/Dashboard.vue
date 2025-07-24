@@ -414,6 +414,23 @@ watch(activeTab, (tab) => {
                 </a>
               </li>
             </ul>
+            <form @submit.prevent="handleSignDocument" class="space-y-2">
+                <label class="block font-medium">Selecciona certificado:</label>
+                <select v-model="signForm.certificateId" class="block w-full border rounded p-2">
+                  <option disabled value="">Selecciona un certificado</option>
+                  <option v-for="cert in certificates" :key="cert.id" :value="cert.id">
+                    {{ cert.filename }} ({{ new Date(cert.createdAt).toLocaleString() }})
+                  </option>
+                </select>
+                <input v-model="signForm.certPassword" type="password" placeholder="Contraseña del certificado" class="block w-full border rounded p-2" required />
+                <div class="flex space-x-2">
+                  <input v-model.number="signForm.page" type="number" min="0" placeholder="Página" class="w-1/3 border rounded p-2" required />
+                  <input v-model.number="signForm.x" type="number" min="0" placeholder="Posición X" class="w-1/3 border rounded p-2" required />
+                  <input v-model.number="signForm.y" type="number" min="0" placeholder="Posición Y" class="w-1/3 border rounded p-2" required />
+                </div>
+                <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded">Firmar Documento</button>
+                <p v-if="signStatus" :class="signStatus.includes('correctamente') ? 'text-green-600' : 'text-red-600'">{{ signStatus }}</p>
+              </form>
 
             <!-- Visor PDF vía Blob-URL y formulario de firma -->
             <div v-if="pdfBlobUrl" class="border rounded overflow-hidden p-4">
@@ -449,23 +466,7 @@ watch(activeTab, (tab) => {
                   alt="Firma"
                 />
               </div>
-              <form @submit.prevent="handleSignDocument" class="space-y-2">
-                <label class="block font-medium">Selecciona certificado:</label>
-                <select v-model="signForm.certificateId" class="block w-full border rounded p-2">
-                  <option disabled value="">Selecciona un certificado</option>
-                  <option v-for="cert in certificates" :key="cert.id" :value="cert.id">
-                    {{ cert.filename }} ({{ new Date(cert.createdAt).toLocaleString() }})
-                  </option>
-                </select>
-                <input v-model="signForm.certPassword" type="password" placeholder="Contraseña del certificado" class="block w-full border rounded p-2" required />
-                <div class="flex space-x-2">
-                  <input v-model.number="signForm.page" type="number" min="0" placeholder="Página" class="w-1/3 border rounded p-2" required />
-                  <input v-model.number="signForm.x" type="number" min="0" placeholder="Posición X" class="w-1/3 border rounded p-2" required />
-                  <input v-model.number="signForm.y" type="number" min="0" placeholder="Posición Y" class="w-1/3 border rounded p-2" required />
-                </div>
-                <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded">Firmar Documento</button>
-                <p v-if="signStatus" :class="signStatus.includes('correctamente') ? 'text-green-600' : 'text-red-600'">{{ signStatus }}</p>
-              </form>
+              
             </div>
           </div>
         </div>
