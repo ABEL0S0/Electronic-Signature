@@ -25,7 +25,8 @@
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
     "tailwindcss": "^4.1.7",
-    "vue": "^3.5.13"
+    "vue": "^3.5.13",
+    "vue-router": "^4.5.1"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.2.3",
@@ -33,9 +34,9 @@
     "autoprefixer": "^10.4.21",
     "concurrently": "^9.1.2",
     "postcss": "^8.5.3",
+    "tsx": "^4.19.4",
     "typescript": "~5.8.3",
     "vite": "^6.3.5",
-    "tsx": "^4.19.4",
     "vue-tsc": "^2.2.8"
   },
   "trustedDependencies": [

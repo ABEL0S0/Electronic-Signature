@@ -1,603 +1,204 @@
 <script setup>
-import { ref, onMounted, watch } from "vue";
-import axios from "axios";
-import { authService, authState } from "../service/Auth";
-import {
-  uploadDocument,
-  uploadCertificate,
-  getDocumentsByUser,
-  getCertificatesByUser,
-  deleteDocument,
-  deleteCertificate,
-  downloadDocument,
-  downloadCertificate
-} from "../utils/api";
-import firmaImg from "../assets/firma.png";
+import { ref, onMounted } from 'vue';
+import UploadSection from '../components/UploadSection.vue';
+import SignDocuments from '../components/SignDocuments.vue';
+import MyDocuments from '../components/MyDocuments.vue';
+import RequestSignature from '../components/RequestSignature.vue';
+import { authState } from '../service/Auth';
 
-// —– Tabs y usuario —–
-const activeTab = ref("upload");      // upload, sign, documents
-const currentUser = authState.user;
-const userName = currentUser
-  ? `${currentUser.firstName} ${currentUser.lastName}`
-  : "Usuario";
-const userEmail = ref(currentUser?.email || "");
+const activeSection = ref('dashboard');
+const isLoggedIn = ref(true); // Simulación de login
 
-// —– Listas globales —–
-const documents   = ref([]);
-const certificates = ref([]);
+const stats = [
+  { label: 'Documentos Firmados', value: '24', change: '+12%' },
+  { label: 'Pendientes', value: '3', change: '+2' },
+  { label: 'Certificados', value: '2', change: 'Activos' },
+  { label: 'Este Mes', value: '18', change: '+8%' },
+];
 
-// —– Archivos PDF para firmar y su vista —–
-const docsToSign  = ref([]);
-const pdfBlobUrl  = ref(null);
+const quickActions = [
+  { icon: 'upload', label: 'Subir Documento', action: () => (activeSection.value = 'upload') },
+  { icon: 'pen', label: 'Firmar Ahora', action: () => (activeSection.value = 'sign') },
+  { icon: 'users', label: 'Solicitar Firma', action: () => (activeSection.value = 'request') },
+  { icon: 'file', label: 'Ver Documentos', action: () => (activeSection.value = 'documents') },
+];
 
-// —– Subida de archivos —–
-const documentFile   = ref(null);
-const documentStatus = ref("");
-const certificateFile     = ref(null);
-const certificatePassword = ref("");
-const certificateStatus   = ref("");
-
-// —– Crear Firma —–
-const form = ref({
-  nombre: "",
-  correo: "",
-  organizacion: "",
-  password: "",
-  opcion: "descargar",
-});
-const certStatus = ref("");
-
-// —– Helpers —–
-function getToken() {
-  return localStorage.getItem("token");
-}
-
-// —– Carga inicial —–
-async function loadUserFiles() {
-  if (!userEmail.value) return;
-  try {
-    const [docsRes, certsRes] = await Promise.all([
-      getDocumentsByUser(),
-      getCertificatesByUser(userEmail.value)
-    ]);
-    documents.value    = docsRes.data;
-    certificates.value = certsRes.data;
-  } catch (e) {
-    console.error("Error cargando archivos:", e);
+function renderIcon(icon, classes = '') {
+  // SVGs inline para Vue (puedes reemplazar por componentes si tienes una librería de iconos)
+  switch (icon) {
+    case 'upload':
+      return `<svg class="${classes}" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M4 12l8-8m0 0l8 8m-8-8v12"/></svg>`;
+    case 'pen':
+      return `<svg class="${classes}" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16.862 3.487a2.6 2.6 0 113.677 3.677L7.5 20.205l-4 1 1-4 12.362-13.718z"/></svg>`;
+    case 'users':
+      return `<svg class="${classes}" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m9-7a4 4 0 11-8 0 4 4 0 018 0zm6 8a4 4 0 00-3-3.87M6 10a4 4 0 100-8 4 4 0 000 8z"/></svg>`;
+    case 'file':
+      return `<svg class="${classes}" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7V3a1 1 0 011-1h8a1 1 0 011 1v4m-2 4h2a2 2 0 012 2v7a2 2 0 01-2 2H7a2 2 0 01-2-2v-7a2 2 0 012-2h2m2-4v4m0 0H7m4 0h4"/></svg>`;
+    case 'leaf':
+      return `<svg class="${classes}" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 21c0-4.418 7-8 7-8s7 3.582 7 8"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v8"/></svg>`;
+    case 'bell':
+      return `<svg class="${classes}" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>`;
+    case 'search':
+      return `<svg class="${classes}" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11A6 6 0 105 11a6 6 0 0012 0z"/></svg>`;
+    case 'plus':
+      return `<svg class="${classes}" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>`;
+    default:
+      return '';
   }
 }
 
-// —– Upload Document —–
-function handleDocumentFileSelect(e) {
-  documentFile.value = e.target.files[0];
-  documentStatus.value = "";
-}
-async function handleUploadDocument() {
-  if (!documentFile.value) {
-    documentStatus.value = "Selecciona un archivo";
-    return;
-  }
-  documentStatus.value = "Subiendo documento...";
-  try {
-    await uploadDocument(documentFile.value);
-    documentStatus.value = "Documento subido exitosamente";
-    documentFile.value = null;
-    await loadUserFiles();
-  } catch {
-    documentStatus.value = "Error al subir el documento";
-  }
-}
+const getUserInitials = () => {
+  if (!authState.user) return '';
+  const { firstName, lastName } = authState.user;
+  return `${(firstName?.[0] || '').toUpperCase()}${(lastName?.[0] || '').toUpperCase()}`;
+};
+const getUserFullName = () => {
+  if (!authState.user) return '';
+  const { firstName, lastName } = authState.user;
+  return `${firstName || ''} ${lastName || ''}`.trim();
+};
 
-// —– Upload Certificate —–
-function handleCertificateFileSelect(e) {
-  certificateFile.value = e.target.files[0];
-  certificateStatus.value = "";
-}
-async function handleUploadCertificate() {
-  if (!certificateFile.value || !certificatePassword.value) {
-    certificateStatus.value = "Completa todos los campos";
-    return;
-  }
-  certificateStatus.value = "Subiendo certificado...";
-  try {
-    await uploadCertificate(certificateFile.value, certificatePassword.value);
-    certificateStatus.value = "Certificado subido exitosamente";
-    certificateFile.value = null;
-    certificatePassword.value = "";
-    await loadUserFiles();
-  } catch {
-    certificateStatus.value = "Error al subir el certificado";
-  }
-}
-
-// —– Descargar y eliminar Document —–
-async function handleDownloadDocument(doc) {
-  try {
-    const res = await downloadDocument(doc.id);
-    const blob = new Blob([res.data], { type: res.headers["content-type"] });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = doc.fileName;
-    link.click();
-  } catch {
-    alert("Error al descargar documento.");
-  }
-}
-async function handleDeleteDocument(id) {
-  if (!confirm("¿Eliminar documento?")) return;
-  try {
-    await deleteDocument(id);
-    await loadUserFiles();
-    pdfBlobUrl.value = null;
-  } catch {
-    alert("Error al eliminar documento.");
-  }
-}
-
-// —– Descargar y eliminar Certificate —–
-async function handleDownloadCertificate(cert) {
-  const pwd = prompt("Introduce contraseña:");
-  if (!pwd) return alert("Contraseña obligatoria.");
-  try {
-    const res = await downloadCertificate(cert.id, pwd);
-    const blob = new Blob([res.data], { type: "application/octet-stream" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = cert.filename;
-    link.click();
-  } catch {
-    alert("Error al descargar certificado.");
-  }
-}
-async function handleDeleteCertificate(id) {
-  if (!confirm("¿Eliminar certificado?")) return;
-  try {
-    await deleteCertificate(id);
-    await loadUserFiles();
-  } catch {
-    alert("Error al eliminar certificado.");
-  }
-}
-
-// —– Lista para firmar —–
-async function fetchDocsToSign() {
-  try {
-    const res = await axios.get("/api/documents/list", {
-      headers: { Authorization: `Bearer ${getToken()}` }
-    });
-    docsToSign.value = res.data;
-  } catch (e) {
-    console.error("Error cargando docs para firmar:", e);
-  }
-}
-
-// —– Ver PDF autenticado con Blob —–
-async function viewDocument(id) {
-  try {
-    if (pdfBlobUrl.value) {
-      URL.revokeObjectURL(pdfBlobUrl.value);
-      pdfBlobUrl.value = null;
-    }
-    const res = await axios.get(`/api/documents/${id}/view`, {
-      headers: { Authorization: `Bearer ${getToken()}` },
-      responseType: "blob"
-    });
-    pdfBlobUrl.value = URL.createObjectURL(res.data);
-    activeTab.value = "sign";
-  } catch (e) {
-    console.error("Error al cargar PDF:", e);
-    alert("No se pudo mostrar el documento.");
-  }
-}
-
-// —– Crear certificado —–
-async function solicitarCertificado() {
-  certStatus.value = "";
-  try {
-    const res = await fetch("/api/certificates/request", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${getToken()}`,
-      },
-      body: JSON.stringify(form.value),
-    });
-
-    if (!res.ok) throw new Error("Error al generar el certificado");
-
-    if (form.value.opcion === "descargar") {
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "firma_electronica.p12";
-      a.click();
-      URL.revokeObjectURL(url);
-      certStatus.value = "Certificado generado y descargado correctamente";
-    } else {
-      const data = await res.json();
-      certStatus.value = data.message || "Certificado guardado correctamente";
-    }
-  } catch (err) {
-    certStatus.value = "Hubo un error: " + err.message;
-  }
-}
-
-// —– Logout —–
-function handleSignOut() {
-  authService.clearAuth();
-  window.location.hash = "/";
-}
-
-const signForm = ref({
-  documentId: null,
-  certificateId: null,
-  certPassword: "",
-  page: 0,
-  x: 100,
-  y: 100,
-});
-const signStatus = ref("");
-
-async function handleSignDocument() {
-  signStatus.value = "";
-  if (!signForm.value.documentId || !signForm.value.certificateId || !signForm.value.certPassword) {
-    signStatus.value = "Completa todos los campos";
-    return;
-  }
-  try {
-    const params = new URLSearchParams({
-      page: signForm.value.page,
-      x: signForm.value.x,
-      y: signForm.value.y,
-      certificateId: signForm.value.certificateId,
-      certPassword: signForm.value.certPassword,
-    });
-    const res = await axios.post(`/api/documents/sign/${signForm.value.documentId}?${params.toString()}`, {}, {
-      headers: { Authorization: `Bearer ${getToken()}` }
-    });
-    signStatus.value = res.data || "Documento firmado correctamente";
-    await loadUserFiles();
-    await fetchDocsToSign();
-  } catch (e) {
-    signStatus.value = e.response?.data || "Error al firmar documento";
-  }
-}
-
-function handlePdfClick(e) {
-  // Obtener la posición relativa al contenedor
-  const rect = e.currentTarget.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-  const y = e.clientY - rect.top;
-  signForm.value.x = Math.round(x);
-  signForm.value.y = Math.round(y);
-}
-
-// —– Ciclo de vida —–
 onMounted(() => {
-  loadUserFiles();
-  if (activeTab.value === "sign") fetchDocsToSign();
-});
-watch(activeTab, (tab) => {
-  if (tab === "sign") fetchDocsToSign();
+  window.addEventListener('go-to-request-signature', () => {
+    activeSection.value = 'request';
+  });
 });
 </script>
 
 <template>
-  <div class="min-h-screen bg-gradient-to-b from-blue-50 to-blue-100">
-    <header class="bg-white shadow">
-      <div
-        class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 flex justify-between items-center"
-      >
-        <div>
-          <h1 class="text-3xl font-medium tracking-tight text-gray-900">
-            Firmas Electrónicas
-          </h1>
-          <p class="text-gray-500">Sistema de gestión de documentos y firmas</p>
-        </div>
-        <div class="flex items-center">
-          <span class="mr-4 text-gray-700">{{ userName }}</span>
-          <a
-            href="#/"
-            @click.prevent="handleSignOut"
-            class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium"
-            >Cerrar Sesión</a
-          >
+  <div class="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50">
+    <!-- Top Navigation -->
+    <nav class="bg-white/90 backdrop-blur-md border-b border-emerald-100 sticky top-0 z-50">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-between items-center h-16">
+          <!-- Logo y nombre -->
+          <div class="flex items-center space-x-3">
+            <img src="../assets/E.png" alt="E-Signature Logo" class="w-10 h-10 rounded-xl shadow-lg" style="object-fit: contain;" />
+            <div>
+              <h1 class="text-xl font-bold text-slate-900">E-Signature</h1>
+              <p class="text-xs text-slate-500">Firmas Electrónicas</p>
+            </div>
+          </div>
+          <!-- Search -->
+          <div class="hidden md:flex flex-1 max-w-md mx-8">
+            <div class="relative w-full">
+              <span class="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" v-html="renderIcon('search', 'w-4 h-4')"></span>
+              <input placeholder="Buscar documentos..." class="pl-10 border-emerald-200 focus:border-emerald-400 focus:ring-emerald-400 rounded-md w-full py-2" />
+            </div>
+          </div>
+          <!-- User Actions -->
+          <div class="flex items-center space-x-4">
+            <button class="relative bg-transparent p-2 rounded-full hover:bg-emerald-50">
+              <span v-html="renderIcon('bell', 'w-5 h-5 text-slate-600')"></span>
+              <span class="absolute -top-1 -right-1 w-5 h-5 p-0 bg-emerald-500 text-white text-xs flex items-center justify-center rounded-full">3</span>
+            </button>
+            <button class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded hidden sm:flex items-center" @click="activeSection = 'upload'">
+              <span v-html="renderIcon('plus', 'w-4 h-4 mr-2')"></span>
+              Nuevo
+            </button>
+            <div class="flex items-center space-x-3">
+              <div class="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold">{{ getUserInitials() }}</div>
+              <div class="hidden sm:block">
+                <p class="text-sm font-medium text-slate-900">{{ getUserFullName() }}</p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-    </header>
-
-    <main>
-      <div class="mx-auto max-w-7xl py-6 sm:px-6 lg:px-8">
-        <!-- Navigation Tabs -->
-        <div class="mb-6">
-          <nav class="flex space-x-8">
-            <button
-              @click="activeTab = 'upload'"
-              :class="[
-                'px-3 py-2 rounded-md text-sm font-medium',
-                activeTab === 'upload'
-                  ? 'bg-blue-100 text-blue-700'
-                  : 'text-gray-500 hover:text-gray-700'
-              ]"
-            >
-              Subir Archivos
-            </button>
-            <button
-              @click="activeTab = 'sign'"
-              :class="[
-                'px-3 py-2 rounded-md text-sm font-medium',
-                activeTab === 'sign'
-                  ? 'bg-blue-100 text-blue-700'
-                  : 'text-gray-500 hover:text-gray-700'
-              ]"
-            >
-              Firmar Documentos
-            </button>
-            <button
-              @click="activeTab = 'documents'"
-              :class="[
-                'px-3 py-2 rounded-md text-sm font-medium',
-                activeTab === 'documents'
-                  ? 'bg-blue-100 text-blue-700'
-                  : 'text-gray-500 hover:text-gray-700'
-              ]"
-            >
-              Mis Documentos
-            </button>
-            <button
-              @click="activeTab = 'request'"
-              :class="[
-                'px-3 py-2 rounded-md text-sm font-medium',
-                activeTab === 'request'
-                  ? 'bg-blue-100 text-blue-700'
-                  : 'text-gray-500 hover:text-gray-700'
-              ]"
-            >
-              Solicitar Firma
-            </button>
-          </nav>
-        </div>
-
-        <!-- Upload Files Tab -->
-        <div v-if="activeTab === 'upload'" class="bg-white shadow rounded-lg p-6">
-          <h2 class="text-xl font-semibold text-gray-900 mb-4">Subir Archivos</h2>
-          <p class="text-gray-600 mb-6">
-            Sube archivos PDF y certificados para firmar electrónicamente.
-          </p>
-
-          <div class="space-y-8">
-            <!-- Subir Documento PDF -->
+    </nav>
+    <!-- Side Navigation -->
+    <div class="flex">
+      <aside class="w-64 bg-white/60 backdrop-blur-sm border-r border-emerald-100 min-h-screen p-6 hidden lg:block">
+        <nav class="space-y-2">
+          <button :class="['w-full justify-start flex items-center px-4 py-2 rounded', activeSection === 'dashboard' ? 'bg-emerald-600 text-white' : 'hover:bg-emerald-50 text-slate-700']" @click="activeSection = 'dashboard'">
+            <div class="w-5 h-5 mr-3 rounded bg-emerald-100 flex items-center justify-center"><div class="w-2 h-2 bg-emerald-600 rounded"></div></div>
+            Dashboard
+          </button>
+          <button :class="['w-full justify-start flex items-center px-4 py-2 rounded', activeSection === 'sign' ? 'bg-emerald-600 text-white' : 'hover:bg-emerald-50 text-slate-700']" @click="activeSection = 'sign'">
+            <span v-html="renderIcon('pen', 'w-5 h-5 mr-3')"></span>
+            Firmar Documentos
+          </button>
+          <button :class="['w-full justify-start flex items-center px-4 py-2 rounded', activeSection === 'upload' ? 'bg-emerald-600 text-white' : 'hover:bg-emerald-50 text-slate-700']" @click="activeSection = 'upload'">
+            <span v-html="renderIcon('upload', 'w-5 h-5 mr-3')"></span>
+            Subir Archivos
+          </button>
+          <button :class="['w-full justify-start flex items-center px-4 py-2 rounded', activeSection === 'documents' ? 'bg-emerald-600 text-white' : 'hover:bg-emerald-50 text-slate-700']" @click="activeSection = 'documents'">
+            <span v-html="renderIcon('file', 'w-5 h-5 mr-3')"></span>
+            Mis Documentos
+          </button>
+          <button :class="['w-full justify-start flex items-center px-4 py-2 rounded', activeSection === 'request' ? 'bg-emerald-600 text-white' : 'hover:bg-emerald-50 text-slate-700']" @click="activeSection = 'request'">
+            <span v-html="renderIcon('users', 'w-5 h-5 mr-3')"></span>
+            Solicitar Firma
+          </button>
+        </nav>
+        <!-- User Card -->
+        <div class="mt-8 border-0 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-xl p-4">
+          <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white font-bold">{{ getUserInitials() }}</div>
             <div>
-              <h3 class="text-lg font-semibold mb-2">Subir Documento PDF</h3>
-              <input type="file" accept=".pdf" @change="handleDocumentFileSelect" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
-              <button @click="handleUploadDocument" class="mt-2 bg-blue-600 text-white px-4 py-2 rounded">Subir Documento</button>
-              <p v-if="documentStatus" class="mt-2" :class="documentStatus.includes('exitosamente') ? 'text-green-600' : 'text-red-600'">{{ documentStatus }}</p>
-            </div>
-
-            <!-- Subir Certificado -->
-            <div>
-              <h3 class="text-lg font-semibold mb-2">Subir Certificado</h3>
-              <input type="file" accept=".p12,.pfx,.cer,.crt" @change="handleCertificateFileSelect" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
-              <input type="password" v-model="certificatePassword" placeholder="Contraseña del certificado" class="mt-2 block" />
-              <button @click="handleUploadCertificate" class="mt-2 bg-green-600 text-white px-4 py-2 rounded">Subir Certificado</button>
-              <p v-if="certificateStatus" class="mt-2" :class="certificateStatus.includes('exitosamente') ? 'text-green-600' : 'text-red-600'">{{ certificateStatus }}</p>
+              <p class="font-medium">{{ getUserFullName() }}</p>
             </div>
           </div>
+          <button class="w-full mt-3 text-white hover:bg-white/20 rounded py-2" @click="isLoggedIn = false">Cerrar Sesión</button>
         </div>
-
-        <!-- Sign Documents Tab -->
-        <div v-if="activeTab === 'sign'" class="bg-white shadow rounded-lg p-6">
-          <h2 class="text-xl font-semibold text-gray-900 mb-4">Firmar Documentos</h2>
-
-          <!-- Mensaje si no hay documentos -->
-          <div v-if="docsToSign.length === 0" class="text-center py-12">
-            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0
-                      012-2h5.586a1 1 0 01.707.293l5.414
-                      5.414a1 1 0 01.293.707V19a2 2 0
-                      01-2 2z"/>
-            </svg>
-            <h3 class="mt-2 text-sm font-medium text-gray-900">No tienes documentos para firmar.</h3>
-          </div>
-
-          <!-- Lista y visor -->
-          <div v-else class="grid md:grid-cols-2 gap-6">
-            <!-- Lista de documentos -->
-            <ul class="space-y-2">
-              <li v-for="doc in docsToSign" :key="doc.id">
-                <a href="#"
-                  @click.prevent="() => { viewDocument(doc.id); signForm.documentId = doc.id; }"
-                  class="text-blue-600 hover:underline">
-                  {{ doc.fileName }}
-                </a>
-              </li>
-            </ul>
-            <form @submit.prevent="handleSignDocument" class="space-y-2">
-                <label class="block font-medium">Selecciona certificado:</label>
-                <select v-model="signForm.certificateId" class="block w-full border rounded p-2">
-                  <option disabled value="">Selecciona un certificado</option>
-                  <option v-for="cert in certificates" :key="cert.id" :value="cert.id">
-                    {{ cert.filename }} ({{ new Date(cert.createdAt).toLocaleString() }})
-                  </option>
-                </select>
-                <input v-model="signForm.certPassword" type="password" placeholder="Contraseña del certificado" class="block w-full border rounded p-2" required />
-                <div class="flex space-x-2">
-                  <input v-model.number="signForm.page" type="number" min="0" placeholder="Página" class="w-1/3 border rounded p-2" required />
-                  <input v-model.number="signForm.x" type="number" min="0" placeholder="Posición X" class="w-1/3 border rounded p-2" required />
-                  <input v-model.number="signForm.y" type="number" min="0" placeholder="Posición Y" class="w-1/3 border rounded p-2" required />
+      </aside>
+      <!-- Main Content -->
+      <main class="flex-1 p-6 lg:p-8">
+        <div class="max-w-6xl mx-auto">
+          <template v-if="activeSection === 'dashboard'">
+            <!-- Acciones Rápidas -->
+            <div class="space-y-8">
+              <div class="border-0 shadow-sm bg-white/80 backdrop-blur-sm rounded-xl">
+                <div class="p-6">
+                  <h2 class="text-xl text-slate-900 font-bold mb-1">Acciones Rápidas</h2>
+                  <p class="text-slate-600 mb-4">Accede rápidamente a las funciones principales</p>
+                  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    <button v-for="(action, index) in quickActions" :key="index" @click="action.action" class="h-24 flex flex-col items-center justify-center space-y-2 border border-emerald-200 hover:bg-emerald-50 hover:border-emerald-300 transition-all duration-200 bg-transparent rounded-xl">
+                      <span v-html="renderIcon(action.icon, 'w-6 h-6 text-emerald-600')"></span>
+                      <span class="text-sm font-medium text-slate-700">{{ action.label }}</span>
+                    </button>
+                  </div>
                 </div>
-                <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded">Firmar Documento</button>
-                <p v-if="signStatus" :class="signStatus.includes('correctamente') ? 'text-green-600' : 'text-red-600'">{{ signStatus }}</p>
-              </form>
-
-            <!-- Visor PDF vía Blob-URL y formulario de firma -->
-            <div v-if="pdfBlobUrl" class="border rounded overflow-hidden p-4">
-              <div
-                class="relative w-full h-96"
-                @click="handlePdfClick"
-                style="cursor: crosshair;"
-              >
-                <iframe
-                  ref="pdfFrame"
-                  :src="pdfBlobUrl"
-                  class="w-full h-96"
-                  frameborder="0"
-                  style="pointer-events: none; position: absolute; left: 0; top: 0;"
-                ></iframe>
-                <!-- Overlay para capturar clics -->
-                <div
-                  class="absolute top-0 left-0 w-full h-full"
-                  style="z-index: 2;"
-                ></div>
-                <!-- Imagen de la firma -->
-                <img
-                  v-if="signForm.x !== null && signForm.y !== null"
-                  :src="firmaImg"
-                  :style="{
-                    position: 'absolute',
-                    left: signForm.x + 'px',
-                    top: signForm.y + 'px',
-                    width: '120px',
-                    height: '60px',
-                    zIndex: 3
-                  }"
-                  alt="Firma"
-                />
               </div>
-              
-            </div>
-          </div>
-        </div>
-
-        <!-- My Documents Tab -->
-        <div v-if="activeTab === 'documents'" class="space-y-6">
-          <!-- PDF Documents -->
-          <div class="bg-white shadow rounded-lg p-6">
-            <h2 class="text-xl font-semibold text-gray-900 mb-4">Documentos PDF</h2>
-            <div v-if="documents.length === 0" class="text-center py-8">
-              <svg
-                class="mx-auto h-12 w-12 text-gray-400"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                />
-              </svg>
-              <h3 class="mt-2 text-sm font-medium text-gray-900">No hay documentos PDF</h3>
-              <p class="mt-1 text-sm text-gray-500">
-                Sube tu primer documento PDF para comenzar.
-              </p>
-            </div>
-            <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div
-                v-for="doc in documents"
-                :key="doc.id"
-                class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
-              >
-                <div class="flex items-center">
-                  <div class="flex-shrink-0 bg-red-100 rounded-full p-2">
-                    <svg class="h-5 w-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
+              <!-- Documentos Pendientes grande -->
+              <div class="border-0 shadow-sm bg-white/80 backdrop-blur-sm rounded-xl flex flex-col items-center justify-center py-16">
+                <div class="flex flex-col items-center">
+                  <div class="w-24 h-24 bg-emerald-100 rounded-full flex items-center justify-center mb-6">
+                    <span v-html="renderIcon('file', 'w-16 h-16 text-emerald-600')"></span>
                   </div>
-                  <div class="ml-3 flex-1">
-                    <p class="text-sm font-medium text-gray-900 truncate">{{ doc.fileName }}</p>
-                    <p class="text-sm text-gray-500">{{ new Date(doc.uploadedAt).toLocaleString() }}</p>
-                  </div>
-                  <button @click="handleDownloadDocument(doc)" class="ml-4 text-gray-400 hover:text-blue-600" title="Descargar">
-                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                    </svg>
-                  </button>
-                  <button @click="handleDeleteDocument(doc.id)" class="ml-2 text-gray-400 hover:text-red-600" title="Eliminar">
-                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </button>
+                  <p class="text-2xl text-slate-700 mb-4 font-semibold">No tienes documentos pendientes</p>
+                  <button class="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-4 rounded text-lg font-bold shadow-lg" @click="activeSection = 'upload'">Subir Documento</button>
                 </div>
               </div>
             </div>
-          </div>
-
-          <!-- Certificates -->
-          <div class="bg-white shadow rounded-lg p-6">
-            <h2 class="text-xl font-semibold text-gray-900 mb-4">Certificados</h2>
-            <div v-if="certificates.length === 0" class="text-center py-8">
-              <svg
-                class="mx-auto h-12 w-12 text-gray-400"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-                />
-              </svg>
-              <h3 class="mt-2 text-sm font-medium text-gray-900">No hay certificados</h3>
-              <p class="mt-1 text-sm text-gray-500">
-                Sube tu primer certificado para comenzar.
-              </p>
-            </div>
-            <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div
-                v-for="cert in certificates"
-                :key="cert.id"
-                class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
-              >
-                <div class="flex items-center">
-                  <div class="flex-shrink-0 bg-green-100 rounded-full p-2">
-                    <svg class="h-5 w-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                    </svg>
-                  </div>
-                  <div class="ml-3 flex-1">
-                    <p class="text-sm font-medium text-gray-900 truncate">{{ cert.filename }}</p>
-                    <p class="text-sm text-gray-500">{{ new Date(cert.createdAt).toLocaleString() }}</p>
-                  </div>
-                  <button @click="handleDownloadCertificate(cert)" class="ml-4 text-gray-400 hover:text-blue-600" title="Descargar">
-                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                    </svg>
-                  </button>
-                  <button @click="handleDeleteCertificate(cert.id)" class="ml-2 text-gray-400 hover:text-red-600" title="Eliminar">
-                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
+          </template>
+          <UploadSection v-else-if="activeSection === 'upload'" />
+          <SignDocuments v-else-if="activeSection === 'sign'" />
+          <MyDocuments v-else-if="activeSection === 'documents'" />
+          <RequestSignature v-else-if="activeSection === 'request'" />
         </div>
-
-        <div v-if="activeTab === 'request'" class="bg-white shadow rounded-lg p-6">
-            <h2 class="text-xl font-semibold text-gray-900 mb-4">Solicitar Firma Electrónica</h2>
-            <form @submit.prevent="solicitarCertificado" class="space-y-4">
-              <input v-model="form.nombre" placeholder="Nombre completo" required class="block w-full" />
-              <input v-model="form.correo" placeholder="Correo electrónico" type="email" required class="block w-full" />
-              <input v-model="form.organizacion" placeholder="Organización (opcional)" class="block w-full" />
-              <input v-model="form.password" type="password" placeholder="Contraseña para .p12" required class="block w-full" />
-              <label>¿Qué deseas hacer con tu certificado?</label>
-              <select v-model="form.opcion" class="block w-full">
-                <option value="descargar">Descargar</option>
-                <option value="guardar">Guardar en el sistema</option>
-              </select>
-              <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded">Solicitar</button>
-              <p v-if="certStatus" :class="certStatus.includes('correctamente') ? 'text-green-600' : 'text-red-600'">{{ certStatus }}</p>
-            </form>
-          </div>
-
+      </main>
+    </div>
+    <!-- Mobile Navigation -->
+    <div class="lg:hidden fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-emerald-100 p-4">
+      <div class="flex justify-around">
+        <button :class="['flex-col space-y-1 items-center', activeSection === 'dashboard' ? 'text-emerald-600' : 'text-slate-600']" @click="activeSection = 'dashboard'">
+          <div class="w-6 h-6 rounded bg-emerald-100 flex items-center justify-center"><div class="w-2 h-2 bg-emerald-600 rounded"></div></div>
+          <span class="text-xs">Inicio</span>
+        </button>
+        <button :class="['flex-col space-y-1 items-center', activeSection === 'sign' ? 'text-emerald-600' : 'text-slate-600']" @click="activeSection = 'sign'">
+          <span v-html="renderIcon('pen', 'w-6 h-6')"></span>
+          <span class="text-xs">Firmar</span>
+        </button>
+        <button :class="['flex-col space-y-1 items-center', activeSection === 'upload' ? 'text-emerald-600' : 'text-slate-600']" @click="activeSection = 'upload'">
+          <span v-html="renderIcon('upload', 'w-6 h-6')"></span>
+          <span class="text-xs">Subir</span>
+        </button>
+        <button :class="['flex-col space-y-1 items-center', activeSection === 'documents' ? 'text-emerald-600' : 'text-slate-600']" @click="activeSection = 'documents'">
+          <span v-html="renderIcon('file', 'w-6 h-6')"></span>
+          <span class="text-xs">Docs</span>
+        </button>
       </div>
-    </main>
+    </div>
   </div>
 </template>
