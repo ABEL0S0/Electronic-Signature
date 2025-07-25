@@ -9,8 +9,11 @@ const errorMessage = ref("");
 const successMessage = ref("");
 const route = useRoute();
 
-// Obtener email de la query si existe
-if (route && route.query && route.query.email) {
+// Obtener email del localStorage o de la query
+const pendingEmail = localStorage.getItem('pendingVerificationEmail');
+if (pendingEmail) {
+  email.value = pendingEmail;
+} else if (route && route.query && route.query.email) {
   email.value = route.query.email as string;
 }
 
@@ -26,6 +29,8 @@ const handleVerify = async () => {
   try {
     await verifyAccount(email.value, code.value);
     successMessage.value = "¡Cuenta verificada correctamente! Redirigiendo al login...";
+    // Limpiar el email del localStorage después de verificación exitosa
+    localStorage.removeItem('pendingVerificationEmail');
     setTimeout(() => {
       window.location.hash = "/";
     }, 1500);
@@ -35,6 +40,8 @@ const handleVerify = async () => {
 };
 
 const goToLogin = () => {
+  // Limpiar el email del localStorage si el usuario decide volver al login
+  localStorage.removeItem('pendingVerificationEmail');
   window.location.hash = "/";
 };
 </script>
@@ -49,14 +56,19 @@ const goToLogin = () => {
         <p class="text-slate-500">Ingresa el código enviado a tu correo</p>
       </div>
       <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-2xl p-8">
-        <h2 class="text-xl font-semibold text-center mb-2">Verificación de Email</h2>
-        <p class="text-center text-slate-600 mb-6 text-sm">Introduce el código de verificación</p>
         <form @submit.prevent="handleVerify" class="space-y-6">
-          <div class="space-y-2">
+          <div class="space-y-2" v-if="!email">
             <label for="email" class="text-slate-700 font-medium">Correo Electrónico</label>
             <div class="relative">
               <svg class="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25H4.5a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-.876 1.797l-7.5 5.625a2.25 2.25 0 01-2.748 0l-7.5-5.625A2.25 2.25 0 012.25 6.993V6.75"/></svg>
               <input v-model="email" id="email" type="email" placeholder="tu@email.com" required class="pl-12 h-12 border-emerald-200 focus:border-emerald-400 focus:ring-emerald-400 w-full rounded-md" />
+            </div>
+          </div>
+          <div v-else class="space-y-2">
+            <label class="text-slate-700 font-medium">Correo Electrónico</label>
+            <div class="relative">
+              <svg class="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25H4.5a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-.876 1.797l-7.5 5.625a2.25 2.25 0 01-2.748 0l-7.5-5.625A2.25 2.25 0 012.25 6.993V6.75"/></svg>
+              <input :value="email" disabled class="pl-12 h-12 border-emerald-200 bg-slate-50 text-slate-600 w-full rounded-md" />
             </div>
           </div>
           <div class="space-y-2">

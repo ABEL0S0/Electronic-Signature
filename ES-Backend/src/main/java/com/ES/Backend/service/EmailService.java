@@ -26,7 +26,7 @@ public class EmailService {
                   <div style="max-width: 600px; margin: auto; background-color: #ffffff; border-radius: 10px; padding: 30px; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);">
                     <div style="text-align: center; margin-bottom: 20px;">
                       <img src="https://cdn-icons-png.flaticon.com/512/942/942748.png" alt="Firma electrónica" width="80" style="margin-bottom: 10px;">
-                      <h1 style="color: #2b2d42; margin: 0;">¡Bienvenido a eSignature!</h1>
+                      <h1 style="color: #2b2d42; margin: 0;">¡Bienvenido a E-Signature!</h1>
                     </div>
               
                     <p style="font-size: 16px; color: #444444; text-align: center;">
@@ -48,7 +48,7 @@ public class EmailService {
                     <hr style="margin: 30px 0; border: none; border-top: 1px solid #eeeeee;">
               
                     <p style="font-size: 13px; color: #aaa; text-align: center;">
-                      © 2025 eSignature. Todos los derechos reservados.
+                      © 2025 E-Signature. Todos los derechos reservados.
                     </p>
                   </div>
                 </div>

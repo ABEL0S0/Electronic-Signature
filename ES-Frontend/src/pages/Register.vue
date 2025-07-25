@@ -31,7 +31,11 @@ const handleRegister = () => {
   register(firstName.value, lastName.value, email.value, password.value)
     .then((response) => {
       if (response.status === 200 || response.status === 201) {
-        successMessage.value = "¡Cuenta creada correctamente! Completa la verificación.";
+        successMessage.value = "¡Cuenta creada correctamente! Redirigiendo a verificación...";
+        // Redirigir automáticamente a verificación después de un breve delay
+        setTimeout(() => {
+          goToVerification();
+        }, 1500);
       } else {
         errorMessage.value = "No se pudo crear la cuenta. Intenta de nuevo.";
       }
@@ -46,7 +50,9 @@ const goToLogin = () => {
 };
 
 const goToVerification = () => {
-  window.location.hash = '/verify?email=' + encodeURIComponent(email.value);
+  // Guardar el email en localStorage para pasarlo a la página de verificación
+  localStorage.setItem('pendingVerificationEmail', email.value);
+  window.location.hash = '/verify';
 }
 </script>
 
@@ -133,9 +139,7 @@ const goToVerification = () => {
             </label>
           </div>
           <button type="submit" class="w-full h-12 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-medium rounded-md shadow-lg">Crear Cuenta</button>
-          <div v-if="successMessage" class="text-center text-green-600 text-sm mt-2">{{ successMessage }}
-            <button @click="goToVerification" class="mt-4 w-full h-12 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-medium rounded-md shadow-lg">Ir a verificación</button>
-          </div>
+          <div v-if="successMessage" class="text-center text-green-600 text-sm mt-2">{{ successMessage }}</div>
           <div v-if="errorMessage" class="text-center text-red-600 text-sm mt-2">{{ errorMessage }}</div>
         </form>
         <div class="my-6 flex items-center">

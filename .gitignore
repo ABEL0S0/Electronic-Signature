@@ -1,1 +1,5 @@
 node_modules/
+.vscode/
+*.pdf
+*.p12
+*.pfx

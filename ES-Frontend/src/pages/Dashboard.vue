@@ -1,13 +1,14 @@
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import UploadSection from '../components/UploadSection.vue';
 import SignDocuments from '../components/SignDocuments.vue';
 import MyDocuments from '../components/MyDocuments.vue';
 import RequestSignature from '../components/RequestSignature.vue';
-import { authState } from '../service/Auth';
+import { authState, authService } from '../service/Auth';
+import { getDocumentsByUser } from '../utils/api';
 
 const activeSection = ref('dashboard');
-const isLoggedIn = ref(true); // Simulación de login
+const documents = ref([]);
 
 const stats = [
   { label: 'Documentos Firmados', value: '24', change: '+12%' },
@@ -58,7 +59,34 @@ const getUserFullName = () => {
   return `${firstName || ''} ${lastName || ''}`.trim();
 };
 
+// —– Logout —–
+function handleSignOut() {
+  authService.clearAuth();
+  window.location.hash = "/";
+}
+
+// Función para obtener documentos del usuario
+async function fetchDocuments() {
+  try {
+    const res = await getDocumentsByUser();
+    documents.value = res.data;
+  } catch (error) {
+    console.error('Error fetching documents:', error);
+  }
+}
+
+// Documentos pendientes de firma
+const pendingDocuments = computed(() => {
+  return documents.value.filter(doc => !doc.signed && doc.status !== 'Firmado');
+});
+
+// Documentos firmados
+const signedDocuments = computed(() => {
+  return documents.value.filter(doc => doc.signed || doc.status === 'Firmado');
+});
+
 onMounted(() => {
+  fetchDocuments();
   window.addEventListener('go-to-request-signature', () => {
     activeSection.value = 'request';
   });
@@ -139,7 +167,7 @@ onMounted(() => {
               <p class="font-medium">{{ getUserFullName() }}</p>
             </div>
           </div>
-          <button class="w-full mt-3 text-white hover:bg-white/20 rounded py-2" @click="isLoggedIn = false">Cerrar Sesión</button>
+          <button class="w-full mt-3 text-white hover:bg-white/20 rounded py-2" @click="handleSignOut">Cerrar Sesión</button>
         </div>
       </aside>
       <!-- Main Content -->
@@ -160,14 +188,85 @@ onMounted(() => {
                   </div>
                 </div>
               </div>
-              <!-- Documentos Pendientes grande -->
-              <div class="border-0 shadow-sm bg-white/80 backdrop-blur-sm rounded-xl flex flex-col items-center justify-center py-16">
-                <div class="flex flex-col items-center">
-                  <div class="w-24 h-24 bg-emerald-100 rounded-full flex items-center justify-center mb-6">
-                    <span v-html="renderIcon('file', 'w-16 h-16 text-emerald-600')"></span>
+              <!-- Documentos Pendientes -->
+              <div class="border-0 shadow-sm bg-white/80 backdrop-blur-sm rounded-xl">
+                <div class="p-6 border-b border-emerald-100">
+                  <h3 class="text-xl font-semibold text-slate-900 mb-2">Documentos Pendientes de Firma</h3>
+                  <p class="text-slate-600 text-sm">Documentos que requieren tu firma digital</p>
+                </div>
+                <div class="p-6">
+                  <div v-if="pendingDocuments.length === 0" class="text-center py-12">
+                    <div class="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <span v-html="renderIcon('file', 'w-10 h-10 text-emerald-600')"></span>
+                    </div>
+                    <p class="text-lg text-slate-700 mb-4 font-medium">No tienes documentos pendientes</p>
+                    <button class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-lg font-medium shadow-lg" @click="activeSection = 'upload'">Subir Documento</button>
                   </div>
-                  <p class="text-2xl text-slate-700 mb-4 font-semibold">No tienes documentos pendientes</p>
-                  <button class="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-4 rounded text-lg font-bold shadow-lg" @click="activeSection = 'upload'">Subir Documento</button>
+                  <div v-else class="space-y-4">
+                    <div v-for="doc in pendingDocuments.slice(0, 5)" :key="doc.id" class="flex items-center justify-between p-4 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors border border-emerald-100">
+                      <div class="flex items-center space-x-4">
+                        <div class="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center">
+                          <span v-html="renderIcon('file', 'w-6 h-6 text-emerald-600')"></span>
+                        </div>
+                        <div>
+                          <p class="font-medium text-slate-900">{{ doc.fileName }}</p>
+                          <p class="text-sm text-slate-600">{{ new Date(doc.uploadedAt).toLocaleDateString() }} • {{ (doc.size / 1024 / 1024).toFixed(2) }} MB</p>
+                        </div>
+                      </div>
+                      <div class="flex items-center space-x-3">
+                        <span class="bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-xs font-semibold">Pendiente</span>
+                        <button @click="activeSection = 'sign'" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                          Firmar Ahora
+                        </button>
+                      </div>
+                    </div>
+                    <div v-if="pendingDocuments.length > 5" class="text-center pt-4">
+                      <button @click="activeSection = 'documents'" class="text-emerald-600 hover:text-emerald-700 font-medium">
+                        Ver todos los documentos ({{ pendingDocuments.length }})
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Documentos Recientemente Firmados -->
+              <div class="border-0 shadow-sm bg-white/80 backdrop-blur-sm rounded-xl">
+                <div class="p-6 border-b border-emerald-100">
+                  <h3 class="text-xl font-semibold text-slate-900 mb-2">Documentos Recientemente Firmados</h3>
+                  <p class="text-slate-600 text-sm">Tus documentos firmados más recientes</p>
+                </div>
+                <div class="p-6">
+                  <div v-if="signedDocuments.length === 0" class="text-center py-12">
+                    <div class="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <span v-html="renderIcon('file', 'w-10 h-10 text-emerald-600')"></span>
+                    </div>
+                    <p class="text-lg text-slate-700 mb-4 font-medium">No hay documentos firmados</p>
+                    <p class="text-slate-500 text-sm">Los documentos que firmes aparecerán aquí</p>
+                  </div>
+                  <div v-else class="space-y-4">
+                    <div v-for="doc in signedDocuments.slice(0, 3)" :key="doc.id" class="flex items-center justify-between p-4 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors border border-emerald-100">
+                      <div class="flex items-center space-x-4">
+                        <div class="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center">
+                          <span v-html="renderIcon('file', 'w-6 h-6 text-emerald-600')"></span>
+                        </div>
+                        <div>
+                          <p class="font-medium text-slate-900">{{ doc.fileName }}</p>
+                          <p class="text-sm text-slate-600">{{ new Date(doc.uploadedAt).toLocaleDateString() }} • {{ (doc.size / 1024 / 1024).toFixed(2) }} MB</p>
+                        </div>
+                      </div>
+                      <div class="flex items-center space-x-3">
+                        <span class="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-xs font-semibold">Firmado</span>
+                        <button @click="activeSection = 'documents'" class="text-emerald-600 hover:text-emerald-700 font-medium text-sm">
+                          Ver Detalles
+                        </button>
+                      </div>
+                    </div>
+                    <div v-if="signedDocuments.length > 3" class="text-center pt-4">
+                      <button @click="activeSection = 'documents'" class="text-emerald-600 hover:text-emerald-700 font-medium">
+                        Ver todos los documentos firmados ({{ signedDocuments.length }})
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
