@@ -5,11 +5,13 @@ import NotFound from "./pages/NotFound.vue";
 import Login from "./pages/Login.vue";
 import Dashboard from "./pages/Dashboard.vue";
 import { authService } from "./service/Auth";
+import Verification from "./pages/Verification.vue";
 
 const routes = {
   "/": Login,
   "/register": Register,
   "/dashboard": Dashboard,
+  "/verify": Verification,
 };
 
 const currentPath = ref(window.location.hash);

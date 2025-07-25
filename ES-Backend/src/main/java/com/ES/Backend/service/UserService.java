@@ -9,14 +9,18 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.Optional;
 
 @Service
 public class UserService implements UserDetailsService {
+
+    private final EmailService emailService;
     private final UserRepository userRepository;
     private final BCryptPasswordEncoder passwordEncoder;
 
-    public UserService(UserRepository userRepository) {
+    public UserService(UserRepository userRepository, EmailService emailService) {
         this.userRepository = userRepository;
+        this.emailService = emailService;
         this.passwordEncoder = new BCryptPasswordEncoder();
     }
 
@@ -28,10 +32,19 @@ public class UserService implements UserDetailsService {
 
         // Hash password
         String hashedPassword = passwordEncoder.encode(password);
+        String verificationCode = String.format("%06d", new java.util.Random().nextInt(999999));
+
 
         // Create new user
         User user = new User(firstName, lastName, email, hashedPassword);
-        return userRepository.save(user);
+        user.setVerificationCode(verificationCode);
+        user.setVerified(false);
+
+        userRepository.save(user);
+
+        emailService.sendVerificationCode(email, verificationCode);
+
+        return user;
     }
 
     public User authenticateUser(String email, String password) {
@@ -56,4 +69,16 @@ public class UserService implements UserDetailsService {
                 new ArrayList<>()
         );
     }
+
+    public User verifyUserCode(String email, String code) {
+        Optional<User> userOpt = userRepository.findByEmailAndVerificationCode(email, code);
+        if (userOpt.isPresent()) {
+            User user = userOpt.get();
+            user.setVerified(true);
+            user.setVerificationCode(null);
+            return userRepository.save(user);
+        }
+        return null;
+    }
+    
 } 

@@ -87,7 +87,7 @@ const handleRegister = () => {
         alert(
           "Registration successful! Please check your email to verify your account."
         );
-        window.location.hash = "/";
+        window.location.hash = `/verify?email=${encodeURIComponent(email.value)}`;
       } else {
         errorMessage.value = "Registration failed. Please try again.";
       }

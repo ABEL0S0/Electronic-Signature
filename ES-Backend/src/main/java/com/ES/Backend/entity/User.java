@@ -21,6 +21,17 @@ public class User {
     @Column(nullable = false)
     private String password;
 
+    @Column(nullable = false)
+    private boolean verified = false;
+
+    @Column(name = "verification_code")
+    private String verificationCode;
+
+
+
+
+
+
     // Constructors
     public User() {}
 
@@ -70,5 +81,21 @@ public class User {
 
     public void setPassword(String password) {
         this.password = password;
+    }
+
+    public boolean isVerified(){
+        return verified;
+    }
+
+    public void setVerified(boolean verified){
+        this.verified= verified;
+    }
+
+    public String getVerificationCode(){
+        return verificationCode;
+    }
+
+    public void setVerificationCode(String verificationCode){
+        this.verificationCode= verificationCode;
     }
 } 

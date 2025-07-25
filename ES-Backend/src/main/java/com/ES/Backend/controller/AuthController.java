@@ -57,6 +57,17 @@ public class AuthController {
         }
     }
 
+    @PostMapping("/verify")
+    public ResponseEntity<String> verifyCode(@RequestBody User request) {
+        var user = userService.verifyUserCode(request.getEmail(), request.getVerificationCode());
+        if (user != null) {
+            return ResponseEntity.ok("Cuenta verificada correctamente");
+        } else {
+            return ResponseEntity.badRequest().body("Código inválido o usuario no encontrado");
+        }
+    }
+
+
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@RequestBody AuthRequest request) {
         try {
