@@ -4,6 +4,9 @@ import UploadSection from '../components/UploadSection.vue';
 import SignDocuments from '../components/SignDocuments.vue';
 import MyDocuments from '../components/MyDocuments.vue';
 import RequestSignature from '../components/RequestSignature.vue';
+import CertificateRequestForm from '../components/CertificateRequestForm.vue';
+import AdminCertificateRequests from '../components/AdminCertificateRequests.vue';
+import NotificationToast from '../components/NotificationToast.vue';
 import { authState, authService } from '../service/Auth';
 import { getDocumentsByUser } from '../utils/api';
 
@@ -17,12 +20,29 @@ const stats = [
   { label: 'Este Mes', value: '18', change: '+8%' },
 ];
 
-const quickActions = [
-  { icon: 'upload', label: 'Subir Documento', action: () => (activeSection.value = 'upload') },
-  { icon: 'pen', label: 'Firmar Ahora', action: () => (activeSection.value = 'sign') },
-  { icon: 'users', label: 'Solicitar Firma', action: () => (activeSection.value = 'request') },
-  { icon: 'file', label: 'Ver Documentos', action: () => (activeSection.value = 'documents') },
-];
+const quickActions = computed(() => {
+  const baseActions = [
+    { icon: 'upload', label: 'Subir Documento', action: () => (activeSection.value = 'upload') },
+    { icon: 'pen', label: 'Firmar Ahora', action: () => (activeSection.value = 'sign') },
+    { icon: 'file', label: 'Ver Documentos', action: () => (activeSection.value = 'documents') },
+  ];
+
+  // Agregar acción de solicitar certificado para usuarios normales
+  if (!isAdmin.value) {
+    baseActions.push({ icon: 'shield', label: 'Solicitar Certificado', action: () => (activeSection.value = 'certificate-request') });
+  }
+
+  // Agregar acción de gestionar solicitudes para admins
+  if (isAdmin.value) {
+    baseActions.push({ icon: 'users', label: 'Gestionar Solicitudes', action: () => (activeSection.value = 'admin-requests') });
+  }
+
+  return baseActions;
+});
+
+const isAdmin = computed(() => {
+  return authState.user?.role === 'ADMIN';
+});
 
 function renderIcon(icon, classes = '') {
   // SVGs inline para Vue (puedes reemplazar por componentes si tienes una librería de iconos)
@@ -43,6 +63,8 @@ function renderIcon(icon, classes = '') {
       return `<svg class="${classes}" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11A6 6 0 105 11a6 6 0 0012 0z"/></svg>`;
     case 'plus':
       return `<svg class="${classes}" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>`;
+    case 'shield':
+      return `<svg class="${classes}" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>`;
     default:
       return '';
   }
@@ -154,9 +176,13 @@ onMounted(() => {
             <span v-html="renderIcon('file', 'w-5 h-5 mr-3')"></span>
             Mis Documentos
           </button>
-          <button :class="['w-full justify-start flex items-center px-4 py-2 rounded', activeSection === 'request' ? 'bg-emerald-600 text-white' : 'hover:bg-emerald-50 text-slate-700']" @click="activeSection = 'request'">
+          <button v-if="!isAdmin" :class="['w-full justify-start flex items-center px-4 py-2 rounded', activeSection === 'certificate-request' ? 'bg-emerald-600 text-white' : 'hover:bg-emerald-50 text-slate-700']" @click="activeSection = 'certificate-request'">
+            <span v-html="renderIcon('shield', 'w-5 h-5 mr-3')"></span>
+            Solicitar Certificado
+          </button>
+          <button v-if="isAdmin" :class="['w-full justify-start flex items-center px-4 py-2 rounded', activeSection === 'admin-requests' ? 'bg-emerald-600 text-white' : 'hover:bg-emerald-50 text-slate-700']" @click="activeSection = 'admin-requests'">
             <span v-html="renderIcon('users', 'w-5 h-5 mr-3')"></span>
-            Solicitar Firma
+            Gestionar Solicitudes
           </button>
         </nav>
         <!-- User Card -->
@@ -274,7 +300,8 @@ onMounted(() => {
           <UploadSection v-else-if="activeSection === 'upload'" />
           <SignDocuments v-else-if="activeSection === 'sign'" />
           <MyDocuments v-else-if="activeSection === 'documents'" />
-          <RequestSignature v-else-if="activeSection === 'request'" />
+          <CertificateRequestForm v-else-if="activeSection === 'certificate-request'" />
+          <AdminCertificateRequests v-else-if="activeSection === 'admin-requests'" />
         </div>
       </main>
     </div>
@@ -297,7 +324,14 @@ onMounted(() => {
           <span v-html="renderIcon('file', 'w-6 h-6')"></span>
           <span class="text-xs">Docs</span>
         </button>
+        <button v-if="!isAdmin" :class="['flex-col space-y-1 items-center', activeSection === 'certificate-request' ? 'text-emerald-600' : 'text-slate-600']" @click="activeSection = 'certificate-request'">
+          <span v-html="renderIcon('shield', 'w-6 h-6')"></span>
+          <span class="text-xs">Cert</span>
+        </button>
       </div>
     </div>
+    
+    <!-- Componente de notificaciones -->
+    <NotificationToast />
   </div>
 </template>

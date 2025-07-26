@@ -284,6 +284,20 @@ public class CertificateService {
         repository.deleteById(id);
     }
 
+    public void generateAndSaveCertificate(String nombre, String correo, String organizacion, String password, String username) throws Exception {
+        // 1. Generar par de claves
+        KeyPair keyPair = generateRSAKeyPair();
+
+        // 2. Generar certificado X.509 firmado con tu CA
+        X509Certificate cert = generateUserCertificate(nombre, correo, organizacion, keyPair.getPublic());
+
+        // 3. Crear archivo .p12 protegido con contraseña
+        byte[] p12Bytes = generarP12(cert, keyPair.getPrivate(), password);
+
+        // 4. Guardar en la base de datos
+        guardarCertificadoEnDB(username, p12Bytes, password);
+    }
+
     private String bytesToHex(byte[] bytes) {
         StringBuilder sb = new StringBuilder();
         for (byte b : bytes) {

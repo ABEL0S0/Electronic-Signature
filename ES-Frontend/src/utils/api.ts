@@ -36,13 +36,15 @@ export function register(
   firstName: string,
   lastName: string,
   email: string,
-  password: string
+  password: string,
+  role: string = 'USER'
 ) {
   return api.post("/api/auth/register", {
     firstName,
     lastName,
     email,
     password,
+    role,
   });
 }
 
@@ -106,6 +108,32 @@ export function deleteDocument(id: string) {
 
 export function deleteDocumentsByUser(user: string) {
   return api.delete(`/api/documents/user/${user}`);
+}
+
+// Solicitudes de certificados
+export function createCertificateRequest(request: {
+  nombre: string;
+  correo: string;
+  organizacion: string;
+  password: string;
+}) {
+  return api.post("/api/certificate-requests/request", request);
+}
+
+export function getPendingCertificateRequests() {
+  return api.get("/api/certificate-requests/pending");
+}
+
+export function getUserCertificateRequests() {
+  return api.get("/api/certificate-requests/user");
+}
+
+export function approveCertificateRequest(id: number) {
+  return api.put(`/api/certificate-requests/${id}/approve`);
+}
+
+export function rejectCertificateRequest(id: number, reason: string) {
+  return api.put(`/api/certificate-requests/${id}/reject`, { reason });
 }
 
 export { api };

@@ -1,4 +1,5 @@
 import { reactive } from "vue";
+import { webSocketService } from "./WebSocketService";
 
 interface AuthState {
   token: string | null;
@@ -25,6 +26,9 @@ export const authService = {
     // Save to localStorage for persistence
     localStorage.setItem("token", token);
     localStorage.setItem("user", JSON.stringify(user));
+
+    // Connect to WebSocket for notifications
+    webSocketService.connect(token);
   },
 
   // Clear authentication data
@@ -37,6 +41,9 @@ export const authService = {
     // Clear localStorage
     localStorage.removeItem("token");
     localStorage.removeItem("user");
+
+    // Disconnect WebSocket
+    webSocketService.disconnect();
   },
 
   // Check if user is authenticated

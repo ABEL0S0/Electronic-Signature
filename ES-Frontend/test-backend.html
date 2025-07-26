@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Backend</title>
+</head>
+<body>
+    <h1>Test Backend Connection</h1>
+    <button onclick="testBackend()">Test Backend</button>
+    <button onclick="testWebSocket()">Test WebSocket</button>
+    <div id="results"></div>
+
+    <script>
+        async function testBackend() {
+            const results = document.getElementById('results');
+            try {
+                const response = await fetch('http://localhost:8080/api/auth/health');
+                const text = await response.text();
+                results.innerHTML += `<p>✅ Backend: ${text}</p>`;
+            } catch (error) {
+                results.innerHTML += `<p>❌ Backend Error: ${error.message}</p>`;
+            }
+        }
+
+        function testWebSocket() {
+            const results = document.getElementById('results');
+            try {
+                const ws = new WebSocket('ws://localhost:8080/ws');
+                
+                ws.onopen = () => {
+                    results.innerHTML += `<p>✅ WebSocket conectado</p>`;
+                    ws.send(JSON.stringify({type: 'TEST', message: 'Hello'}));
+                };
+                
+                ws.onmessage = (event) => {
+                    results.innerHTML += `<p>📨 WebSocket mensaje: ${event.data}</p>`;
+                };
+                
+                ws.onerror = (error) => {
+                    results.innerHTML += `<p>❌ WebSocket error: ${error}</p>`;
+                };
+                
+                ws.onclose = (event) => {
+                    results.innerHTML += `<p>🔌 WebSocket cerrado: ${event.code} - ${event.reason}</p>`;
+                };
+            } catch (error) {
+                results.innerHTML += `<p>❌ WebSocket Error: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html> 

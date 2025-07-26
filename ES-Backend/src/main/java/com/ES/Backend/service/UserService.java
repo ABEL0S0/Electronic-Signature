@@ -35,8 +35,8 @@ public class UserService implements UserDetailsService {
         String verificationCode = String.format("%06d", new java.util.Random().nextInt(999999));
 
 
-        // Create new user
-        User user = new User(firstName, lastName, email, hashedPassword);
+        // Create new user with default role 'USER'
+        User user = new User(firstName, lastName, email, hashedPassword, "USER");
         user.setVerificationCode(verificationCode);
         user.setVerified(false);
 

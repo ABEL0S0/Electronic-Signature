@@ -5,7 +5,7 @@ public class CertRequestDTO {
     private String correo;
     private String organizacion;
     private String password; // para el .p12
-    private String opcion;   // "guardar" o "descargar"
+
     public String getNombre() {
         return nombre;
     }
@@ -30,11 +30,4 @@ public class CertRequestDTO {
     public void setPassword(String password) {
         this.password = password;
     }
-    public String getOpcion() {
-        return opcion;
-    }
-    public void setOpcion(String opcion) {
-        this.opcion = opcion;
-    }
-
 }

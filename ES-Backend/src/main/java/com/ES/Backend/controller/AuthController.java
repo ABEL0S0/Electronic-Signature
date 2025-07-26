@@ -30,7 +30,7 @@ public class AuthController {
     record AuthRequest(String email, String password) {}
     record RegisterRequest(String firstName, String lastName, String email, String password) {}
     record AuthResponse(String token, UserResponse user) {}
-    record UserResponse(Long id, String firstName, String lastName, String email) {}
+    record UserResponse(Long id, String firstName, String lastName, String email, String role) {}
 
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(@RequestBody RegisterRequest request) {
@@ -48,7 +48,8 @@ public class AuthController {
                 user.getId(), 
                 user.getFirstName(), 
                 user.getLastName(), 
-                user.getEmail()
+                user.getEmail(),
+                user.getRole()
             );
             
             return ResponseEntity.ok(new AuthResponse(token, userResponse));
@@ -67,7 +68,6 @@ public class AuthController {
         }
     }
 
-
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@RequestBody AuthRequest request) {
         try {
@@ -79,7 +79,8 @@ public class AuthController {
                 user.getId(), 
                 user.getFirstName(), 
                 user.getLastName(), 
-                user.getEmail()
+                user.getEmail(),
+                user.getRole()
             );
             
             return ResponseEntity.ok(new AuthResponse(token, userResponse));
@@ -91,5 +92,15 @@ public class AuthController {
     @GetMapping("/test")
     public String test() {
         return "Auth controller is working!";
+    }
+
+    @GetMapping("/websocket-status")
+    public String websocketStatus() {
+        return "WebSocket endpoint is available at /ws";
+    }
+
+    @GetMapping("/health")
+    public String health() {
+        return "Backend is running!";
     }
 }

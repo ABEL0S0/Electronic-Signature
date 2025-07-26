@@ -1,5 +1,7 @@
 package com.ES.Backend.entity;
 
+import java.util.Date;
+
 import jakarta.persistence.*;
 
 @Entity
@@ -27,19 +29,22 @@ public class User {
     @Column(name = "verification_code")
     private String verificationCode;
 
+    @Column(name = "role", nullable = false)
+    private String role = "USER"; // USER, ADMIN
 
-
-
-
+    @Column(name = "created_at", nullable = false)
+    private Date createdAt;
 
     // Constructors
     public User() {}
 
-    public User(String firstName, String lastName, String email, String password) {
+    public User(String firstName, String lastName, String email, String password, String role) {
         this.firstName = firstName;
         this.lastName = lastName;
         this.email = email;
         this.password = password;
+        this.role = role;
+        this.createdAt = new Date();
     }
 
     // Getters and Setters
@@ -98,4 +103,21 @@ public class User {
     public void setVerificationCode(String verificationCode){
         this.verificationCode= verificationCode;
     }
+
+    public Date getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(Date createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public String getRole() {
+        return role;
+    }
+
+    public void setRole(String role) {
+        this.role = role;
+    }
+    
 } 

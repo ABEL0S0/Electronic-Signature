@@ -28,7 +28,7 @@ const handleRegister = () => {
     errorMessage.value = "Las contraseñas no coinciden";
     return;
   }
-  register(firstName.value, lastName.value, email.value, password.value)
+  register(firstName.value, lastName.value, email.value, password.value, 'USER')
     .then((response) => {
       if (response.status === 200 || response.status === 201) {
         successMessage.value = "¡Cuenta creada correctamente! Redirigiendo a verificación...";

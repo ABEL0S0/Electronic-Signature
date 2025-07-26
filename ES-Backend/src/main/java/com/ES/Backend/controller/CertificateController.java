@@ -52,38 +52,8 @@ public class CertificateController {
         return new UploadResponse(id);
     }
 
-    @PostMapping("/request")
-    public ResponseEntity<?> generarCertificado(
-            @RequestBody CertRequestDTO request,
-            @RequestHeader(HttpHeaders.AUTHORIZATION) String authHeader) throws Exception {
-
-        String token = authHeader.substring(7);
-        String username = jwtService.extractUser(token);
-
-        // 1. Generar par de claves
-        KeyPair keyPair = service.generateRSAKeyPair();
-
-        // 2. Generar certificado X.509 firmado con tu CA
-        X509Certificate cert = service.generateUserCertificate(
-            request.getNombre(),
-            request.getCorreo(),
-            request.getOrganizacion(),
-            keyPair.getPublic()
-        );
-
-        // 3. Crear archivo .p12 protegido con contraseña
-        byte[] p12Bytes = service.generarP12(cert, keyPair.getPrivate(), request.getPassword());
-
-        if ("guardar".equalsIgnoreCase(request.getOpcion())) {
-            service.guardarCertificadoEnDB(username, p12Bytes, request.getPassword());
-            return ResponseEntity.ok(Map.of("message", "Certificado guardado correctamente"));
-        } else {
-            return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=firma_electronica.p12")
-                .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                .body(p12Bytes);
-        }
-    }
+    // El endpoint /request ha sido movido a CertificateRequestController
+    // para manejar solicitudes con aprobación del administrador
 
     @GetMapping(path = "/{id}")
     public ResponseEntity<byte[]> downloadCertificate(
