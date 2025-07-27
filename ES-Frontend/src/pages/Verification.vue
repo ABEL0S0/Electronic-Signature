@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue";
-import { verifyAccount } from "../service/api";
+import { verifyAccount } from "../utils/api";
 import { useRoute } from "vue-router";
 
 const email = ref("");

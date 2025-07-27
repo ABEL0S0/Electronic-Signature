@@ -54,6 +54,10 @@ public class UserService implements UserDetailsService {
         if (!passwordEncoder.matches(password, user.getPassword())) {
             throw new RuntimeException("Invalid credentials");
         }
+        // Check if email is verified
+        if (!user.isVerified()) {
+            throw new EmailNotVerifiedException("Email not verified");
+        }
 
         return user;
     }
@@ -79,6 +83,25 @@ public class UserService implements UserDetailsService {
             return userRepository.save(user);
         }
         return null;
+    }
+    
+    // Request a password reset by generating and emailing a reset code
+    public void requestPasswordReset(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        String resetCode = String.format("%06d", new java.util.Random().nextInt(999999));
+        user.setPasswordResetCode(resetCode);
+        userRepository.save(user);
+        emailService.sendPasswordResetCode(email, resetCode);
+    }
+    
+    // Confirm password reset, setting new password if code matches
+    public User resetPassword(String email, String resetCode, String newPassword) {
+        User user = userRepository.findByEmailAndPasswordResetCode(email, resetCode)
+                .orElseThrow(() -> new PasswordResetException("Invalid or expired reset code"));
+        user.setPassword(passwordEncoder.encode(newPassword));
+        user.setPasswordResetCode(null);
+        return userRepository.save(user);
     }
     
 } 

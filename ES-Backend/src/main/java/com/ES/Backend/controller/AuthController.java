@@ -8,12 +8,17 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 
 import com.ES.Backend.entity.User;
 import com.ES.Backend.service.JwtService;
 import com.ES.Backend.service.UserService;
 
+@CrossOrigin(origins = "*")
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
@@ -29,38 +34,29 @@ public class AuthController {
 
     record AuthRequest(String email, String password) {}
     record RegisterRequest(String firstName, String lastName, String email, String password) {}
+    record VerifyRequest(String email, String verificationCode) {}
     record AuthResponse(String token, UserResponse user) {}
     record UserResponse(Long id, String firstName, String lastName, String email, String role) {}
 
     @PostMapping("/register")
-    public ResponseEntity<AuthResponse> register(@RequestBody RegisterRequest request) {
+    public ResponseEntity<String> register(@RequestBody RegisterRequest request) {
         try {
-            User user = userService.registerUser(
-                request.firstName(), 
-                request.lastName(), 
-                request.email(), 
+            userService.registerUser(
+                request.firstName(),
+                request.lastName(),
+                request.email(),
                 request.password()
             );
-            
-            String token = jwtService.generateToken(user.getEmail());
-            
-            UserResponse userResponse = new UserResponse(
-                user.getId(), 
-                user.getFirstName(), 
-                user.getLastName(), 
-                user.getEmail(),
-                user.getRole()
-            );
-            
-            return ResponseEntity.ok(new AuthResponse(token, userResponse));
+            return ResponseEntity.status(HttpStatus.CREATED)
+                                 .body("Verification code sent to email");
         } catch (Exception e) {
-            return ResponseEntity.badRequest().build();
+            return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
 
     @PostMapping("/verify")
-    public ResponseEntity<String> verifyCode(@RequestBody User request) {
-        var user = userService.verifyUserCode(request.getEmail(), request.getVerificationCode());
+    public ResponseEntity<String> verifyCode(@RequestBody VerifyRequest request) {
+        var user = userService.verifyUserCode(request.email(), request.verificationCode());
         if (user != null) {
             return ResponseEntity.ok("Cuenta verificada correctamente");
         } else {
@@ -68,22 +64,65 @@ public class AuthController {
         }
     }
 
+    // Password reset request endpoint
+    record PasswordResetRequest(String email) {}
+    record PasswordResetConfirmRequest(String email, String passwordResetCode, String newPassword) {}
+    
+    @PostMapping("/password-reset-request")
+    public ResponseEntity<String> passwordResetRequest(@RequestBody PasswordResetRequest request) {
+        try {
+            userService.requestPasswordReset(request.email());
+            return ResponseEntity.ok("Password reset code sent to email");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+    // Support GET for quick testing via browser using path variable: /api/auth/password-reset-request/{email}
+    @GetMapping("/password-reset-request/{email}")
+    public ResponseEntity<String> passwordResetRequestGet(@PathVariable("email") String email) {
+        try {
+            userService.requestPasswordReset(email);
+            return ResponseEntity.ok("Password reset code sent to email");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+    // Support GET for quick testing via browser using query param: /api/auth/password-reset-request?email=...
+    @GetMapping("/password-reset-request")
+    public ResponseEntity<String> passwordResetRequestGetQuery(@RequestParam("email") String email) {
+        try {
+            userService.requestPasswordReset(email);
+            return ResponseEntity.ok("Password reset code sent to email");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+    
+    @PostMapping("/password-reset")
+    public ResponseEntity<String> passwordReset(@RequestBody PasswordResetConfirmRequest request) {
+        try {
+            userService.resetPassword(request.email(), request.passwordResetCode(), request.newPassword());
+            return ResponseEntity.ok("Password updated successfully");
+        } catch (com.ES.Backend.service.PasswordResetException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+    
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@RequestBody AuthRequest request) {
         try {
             User user = userService.authenticateUser(request.email(), request.password());
-            
             String token = jwtService.generateToken(user.getEmail());
-            
             UserResponse userResponse = new UserResponse(
-                user.getId(), 
-                user.getFirstName(), 
-                user.getLastName(), 
+                user.getId(),
+                user.getFirstName(),
+                user.getLastName(),
                 user.getEmail(),
                 user.getRole()
             );
-            
             return ResponseEntity.ok(new AuthResponse(token, userResponse));
+        } catch (com.ES.Backend.service.EmailNotVerifiedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         } catch (Exception e) {
             return ResponseEntity.badRequest().build();
         }

@@ -6,12 +6,16 @@ import Login from "./pages/Login.vue";
 import Dashboard from "./pages/Dashboard.vue";
 import { authService } from "./service/Auth";
 import Verification from "./pages/Verification.vue";
+import PasswordResetRequest from "./pages/PasswordResetRequest.vue";
+import PasswordResetConfirm from "./pages/PasswordResetConfirm.vue";
 
 const routes = {
   "/": Login,
   "/register": Register,
   "/dashboard": Dashboard,
   "/verify": Verification,
+  "/password-reset-request": PasswordResetRequest,
+  "/password-reset": PasswordResetConfirm,
 };
 
 const currentPath = ref(window.location.hash);

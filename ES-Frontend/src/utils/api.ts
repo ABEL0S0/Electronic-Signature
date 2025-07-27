@@ -47,6 +47,31 @@ export function register(
     role,
   });
 }
+// Email verification
+export function verifyAccount(email: string, code: string) {
+  return api.post("/api/auth/verify", {
+    email: email,
+    verificationCode: code,
+  });
+}
+// Password reset APIs
+export function requestPasswordReset(email: string) {
+  return api.post("/api/auth/password-reset-request", {
+    email,
+  });
+}
+
+export function resetPassword(
+  email: string,
+  passwordResetCode: string,
+  newPassword: string
+) {
+  return api.post("/api/auth/password-reset", {
+    email,
+    passwordResetCode,
+    newPassword,
+  });
+}
 
 // Certificados
 export function uploadCertificate(file: File, password: string) {

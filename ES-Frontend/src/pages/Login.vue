@@ -23,7 +23,13 @@ const handleLogin = () => {
       }
     })
     .catch((error) => {
-      errorMessage.value = error.response?.data?.message || "Ocurrió un error al iniciar sesión";
+      if (error.response?.status === 403) {
+        // Email not verified, redirect to verification page
+        localStorage.setItem('pendingVerificationEmail', email.value);
+        window.location.hash = '/verify';
+      } else {
+        errorMessage.value = error.response?.data?.message || "Ocurrió un error al iniciar sesión";
+      }
     });
 };
 
@@ -99,7 +105,7 @@ const goToRegister = () => {
               />
               <label for="remember" class="text-sm text-slate-600">Recordarme</label>
             </div>
-            <a href="#" class="text-sm text-emerald-600 hover:text-emerald-700 font-medium">¿Olvidaste tu contraseña?</a>
+            <a href="#/password-reset-request" class="text-sm text-emerald-600 hover:text-emerald-700 font-medium">¿Olvidaste tu contraseña?</a>
           </div>
           <!-- Botón Iniciar Sesión -->
           <button

@@ -34,6 +34,9 @@ public class User {
 
     @Column(name = "created_at", nullable = false)
     private Date createdAt;
+    
+    @Column(name = "password_reset_code")
+    private String passwordResetCode;
 
     // Constructors
     public User() {}
@@ -118,6 +121,14 @@ public class User {
 
     public void setRole(String role) {
         this.role = role;
+    }
+    
+    public String getPasswordResetCode() {
+        return passwordResetCode;
+    }
+
+    public void setPasswordResetCode(String passwordResetCode) {
+        this.passwordResetCode = passwordResetCode;
     }
     
 } 

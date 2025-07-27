@@ -62,6 +62,37 @@ public class EmailService {
             throw new RuntimeException("No se pudo enviar el correo", e);
         }
     }
+    
+    /**
+     * Envía un código de recuperación de contraseña al correo del usuario.
+     */
+    public void sendPasswordResetCode(String to, String code) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setTo(to);
+            helper.setSubject("Código para restablecer contraseña");
+
+            String html = String.format("""
+                <div style=\"font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f6f8; padding: 40px;\">
+                  <div style=\"max-width: 600px; margin: auto; background-color: #ffffff; border-radius: 10px; padding: 30px;\">
+                    <h2>Restablecimiento de contraseña</h2>
+                    <p>Se solicitó un restablecimiento de contraseña para tu cuenta. Tu código es:</p>
+                    <div style=\"text-align: center; margin: 20px 0;\">
+                      <span style=\"font-size: 28px; font-weight: bold; color: #dc3545;\">%s</span>
+                    </div>
+                    <p>Si no solicitaste este código, ignora este correo.</p>
+                  </div>
+                </div>
+              """, code);
+
+            helper.setText(html, true);
+            mailSender.send(message);
+        } catch (MessagingException e) {
+            throw new RuntimeException("No se pudo enviar el código de recuperación", e);
+        }
+    }
 
     public void sendCertificateRequestNotification(CertificateRequest request) {
         try {
