@@ -126,6 +126,18 @@ public class CertificateService {
             byte[] iv = Base64.getDecoder().decode(entity.getIvHex());
             System.out.println("IV decoded successfully, length: " + iv.length);
 
+            // Manejar certificados antiguos que tienen IV de 24 bytes
+            if (iv.length != 16) {
+                System.out.println("WARNING: IV length is " + iv.length + " bytes, expected 16. This is an old certificate format.");
+                System.out.println("Attempting to use first 16 bytes of IV...");
+                
+                // Tomar solo los primeros 16 bytes del IV
+                byte[] correctedIv = new byte[16];
+                System.arraycopy(iv, 0, correctedIv, 0, 16);
+                iv = correctedIv;
+                System.out.println("IV corrected to 16 bytes");
+            }
+
             byte[] decrypted = cryptoService.cipher(Cipher.DECRYPT_MODE, key, iv).doFinal(entity.getData());
             System.out.println("Certificate decrypted successfully, size: " + decrypted.length + " bytes");
             return decrypted;
@@ -246,24 +258,19 @@ public class CertificateService {
         byte[] salt = SecureRandom.getInstanceStrong().generateSeed(16);
         byte[] iv = SecureRandom.getInstanceStrong().generateSeed(16);
     
-        // Derivar clave con PBKDF2
-        SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
-        KeySpec spec = new PBEKeySpec(password.toCharArray(), salt, 65536, 256);
-        SecretKey tmp = factory.generateSecret(spec);
-        SecretKeySpec secretKey = new SecretKeySpec(tmp.getEncoded(), "AES");
+        // Derivar clave usando CryptoService para consistencia
+        SecretKey key = cryptoService.deriveKey(password.toCharArray(), salt);
     
-        // Cifrar el .p12
-        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-        cipher.init(Cipher.ENCRYPT_MODE, secretKey, new SecureRandom(iv));
-        byte[] encryptedData = cipher.doFinal(p12Bytes);
+        // Cifrar el .p12 usando el CryptoService para consistencia
+        byte[] encryptedData = cryptoService.cipher(Cipher.ENCRYPT_MODE, key, iv).doFinal(p12Bytes);
     
         // Guardar en MongoDB
         Certificate cert = new Certificate();
         cert.setuser(username);
         cert.setFilename("firma_" + username + ".p12");
         cert.setData(encryptedData);
-        cert.setSaltHex(bytesToHex(salt));
-        cert.setIvHex(bytesToHex(iv));
+        cert.setSaltHex(Base64.getEncoder().encodeToString(salt));
+        cert.setIvHex(Base64.getEncoder().encodeToString(iv));
     
         repository.save(cert);
     }
