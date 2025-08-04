@@ -13,6 +13,7 @@
   "dependencies": {
     "@iconify/vue": "^5.0.0",
     "@tailwindcss/vite": "^4.1.7",
+    "pdfjs-dist": "^2.16.105",
     "@types/axios": "^0.14.4",
     "@types/bcryptjs": "^3.0.0",
     "@types/cors": "^2.8.18",
