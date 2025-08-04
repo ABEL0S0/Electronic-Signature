@@ -40,6 +40,10 @@ public class CertificateRequestService {
         return repository.findByStatusOrderByRequestedAtDesc("PENDING");
     }
 
+    public List<CertificateRequest> getAllRequests() {
+        return repository.findAllByOrderByRequestedAtDesc();
+    }
+
     public List<CertificateRequest> getRequestsByUser(String userEmail) {
         return repository.findByUserEmail(userEmail);
     }

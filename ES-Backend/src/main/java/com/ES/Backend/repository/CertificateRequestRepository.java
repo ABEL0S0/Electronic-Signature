@@ -12,4 +12,5 @@ public interface CertificateRequestRepository extends JpaRepository<CertificateR
     List<CertificateRequest> findByUserEmail(String userEmail);
     List<CertificateRequest> findByStatus(String status);
     List<CertificateRequest> findByStatusOrderByRequestedAtDesc(String status);
+    List<CertificateRequest> findAllByOrderByRequestedAtDesc();
 } 

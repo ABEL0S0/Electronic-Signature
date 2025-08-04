@@ -190,7 +190,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { 
-  getPendingCertificateRequests, 
+  getAllCertificateRequests, 
   approveCertificateRequest, 
   rejectCertificateRequest 
 } from '../utils/api';
@@ -247,7 +247,7 @@ const formatDate = (dateString: string) => {
 const fetchRequests = async () => {
   loading.value = true;
   try {
-    const response = await getPendingCertificateRequests();
+    const response = await getAllCertificateRequests();
     requests.value = response.data;
   } catch (error) {
     console.error('Error fetching requests:', error);

@@ -59,6 +59,18 @@ public class CertificateRequestController {
         return ResponseEntity.ok(pendingRequests);
     }
 
+    @GetMapping("/all")
+    public ResponseEntity<List<CertificateRequest>> getAllRequests(
+            @RequestHeader(HttpHeaders.AUTHORIZATION) String authHeader) {
+        
+        String token = authHeader.substring(7);
+        String userEmail = jwtService.extractUser(token);
+        
+        // Aquí podrías verificar si el usuario es admin
+        List<CertificateRequest> allRequests = service.getAllRequests();
+        return ResponseEntity.ok(allRequests);
+    }
+
     @GetMapping("/user")
     public ResponseEntity<List<CertificateRequest>> getUserRequests(
             @RequestHeader(HttpHeaders.AUTHORIZATION) String authHeader) {

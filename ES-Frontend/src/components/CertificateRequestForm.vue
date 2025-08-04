@@ -32,7 +32,8 @@
             type="email"
             placeholder="tu@email.com"
             required
-            class="w-full border border-emerald-200 rounded-md py-3 px-4 focus:ring-emerald-400 focus:border-emerald-400"
+            readonly
+            class="w-full border border-emerald-200 rounded-md py-3 px-4 bg-slate-50 text-slate-600 cursor-not-allowed"
           />
         </div>
       </div>
@@ -120,8 +121,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue';
+import { ref, reactive, onMounted } from 'vue';
 import { createCertificateRequest } from '../utils/api';
+import { authState } from '../service/Auth';
 
 const loading = ref(false);
 const showPassword = ref(false);
@@ -133,6 +135,13 @@ const form = reactive({
   correo: '',
   organizacion: '',
   password: ''
+});
+
+// Cargar el correo del usuario actual al montar el componente
+onMounted(() => {
+  if (authState.user?.email) {
+    form.correo = authState.user.email;
+  }
 });
 
 const handleSubmit = async () => {

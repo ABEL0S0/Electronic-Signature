@@ -149,6 +149,10 @@ export function getPendingCertificateRequests() {
   return api.get("/api/certificate-requests/pending");
 }
 
+export function getAllCertificateRequests() {
+  return api.get("/api/certificate-requests/all");
+}
+
 export function getUserCertificateRequests() {
   return api.get("/api/certificate-requests/user");
 }
