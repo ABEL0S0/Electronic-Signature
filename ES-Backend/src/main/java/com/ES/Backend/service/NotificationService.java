@@ -1,9 +1,16 @@
 package com.ES.Backend.service;
 
+import com.ES.Backend.controller.WebSocketController;
+import com.ES.Backend.entity.Certificate;
+import com.ES.Backend.entity.CertificateRequest;
+import com.ES.Backend.entity.DocumentMetadata;
+import com.ES.Backend.entity.User;
+import com.ES.Backend.repository.CertificateRepository;
+import com.ES.Backend.repository.DocumentMetadataRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import com.ES.Backend.entity.CertificateRequest;
-import com.ES.Backend.controller.WebSocketController;
+
+import java.util.List;
 
 @Service
 public class NotificationService {
@@ -11,47 +18,100 @@ public class NotificationService {
     @Autowired
     private WebSocketController webSocketController;
 
-    public void sendCertificateRequestNotification(CertificateRequest request) {
-        // Notificar a todos los administradores
-        webSocketController.sendNotificationToAdmin(
-            "Nueva solicitud de certificado", 
-            "El usuario " + request.getUserName() + " (" + request.getUserEmail() + ") ha solicitado un certificado digital para la organización: " + request.getOrganization()
-        );
+    @Autowired
+    private CertificateRepository certificateRepository;
+
+    @Autowired
+    private DocumentMetadataRepository documentMetadataRepository;
+
+    /**
+     * Envía notificación cuando se aprueba una solicitud de certificado
+     */
+    public void notifyCertificateApproved(CertificateRequest request) {
+        String userEmail = request.getUserEmail();
+        String title = "Certificado Aprobado";
+        String message = "Tu solicitud de certificado digital ha sido aprobada. Ya puedes firmar documentos.";
+        
+        webSocketController.sendNotificationToUser(userEmail, title, message);
     }
 
-    public void sendCertificateApprovedNotification(CertificateRequest request) {
-        // Notificar al usuario específico
-        webSocketController.sendNotificationToUser(
-            request.getUserEmail(),
-            "✅ Certificado aprobado", 
-            "¡Felicidades! Tu solicitud de certificado digital ha sido aprobada. Tu certificado ya está disponible en el sistema."
-        );
+    /**
+     * Envía notificación cuando se rechaza una solicitud de certificado
+     */
+    public void notifyCertificateRejected(CertificateRequest request) {
+        String userEmail = request.getUserEmail();
+        String title = "Certificado Rechazado";
+        String message = "Tu solicitud de certificado digital ha sido rechazada. Contacta al administrador para más información.";
+        
+        webSocketController.sendNotificationToUser(userEmail, title, message);
     }
 
-    public void sendCertificateRejectedNotification(CertificateRequest request) {
-        // Notificar al usuario específico
-        webSocketController.sendNotificationToUser(
-            request.getUserEmail(),
-            "❌ Certificado rechazado", 
-            "Tu solicitud de certificado digital ha sido rechazada. Motivo: " + request.getRejectionReason() + ". Puedes contactar al administrador para más información."
-        );
+    /**
+     * Envía notificación cuando un usuario tiene documentos pendientes de firma
+     */
+    public void notifyPendingDocuments(String userEmail) {
+        List<DocumentMetadata> allDocs = documentMetadataRepository.findByuser(userEmail);
+        List<DocumentMetadata> pendingDocs = allDocs.stream()
+            .filter(doc -> !doc.isSigned())
+            .toList();
+        
+        if (!pendingDocs.isEmpty()) {
+            String title = "Documentos Pendientes";
+            String message = "Tienes " + pendingDocs.size() + " documento(s) pendiente(s) de firma.";
+            
+            webSocketController.sendNotificationToUser(userEmail, title, message);
+        }
     }
 
-    public void sendDocumentSignedNotification(String userEmail, String documentName) {
-        // Notificar al usuario cuando su documento ha sido firmado
-        webSocketController.sendNotificationToUser(
-            userEmail,
-            "📄 Documento firmado", 
-            "El documento '" + documentName + "' ha sido firmado exitosamente."
-        );
+    /**
+     * Envía notificación cuando un usuario no tiene certificados
+     */
+    public void notifyNoCertificates(String userEmail) {
+        List<Certificate> certificates = certificateRepository.findByuser(userEmail);
+        
+        if (certificates.isEmpty()) {
+            String title = "Certificado Requerido";
+            String message = "Necesitas un certificado digital para firmar documentos. Solicita uno desde el dashboard.";
+            
+            webSocketController.sendNotificationToUser(userEmail, title, message);
+        }
     }
 
-    public void sendDocumentSignatureRequestNotification(String userEmail, String documentName, String requesterName) {
-        // Notificar al usuario cuando se le solicita firmar un documento
-        webSocketController.sendNotificationToUser(
-            userEmail,
-            "✍️ Solicitud de firma", 
-            "El usuario " + requesterName + " te ha solicitado firmar el documento '" + documentName + "'."
-        );
+    /**
+     * Envía notificación cuando un usuario no tiene documentos
+     */
+    public void notifyNoDocuments(String userEmail) {
+        List<DocumentMetadata> documents = documentMetadataRepository.findByuser(userEmail);
+        
+        if (documents.isEmpty()) {
+            String title = "Sin Documentos";
+            String message = "No tienes documentos cargados. Sube tu primer documento para comenzar.";
+            
+            webSocketController.sendNotificationToUser(userEmail, title, message);
+        }
+    }
+
+    /**
+     * Envía notificación a administradores sobre nueva solicitud de certificado
+     */
+    public void notifyAdminNewCertificateRequest(CertificateRequest request) {
+        String title = "Nueva Solicitud de Certificado";
+        String message = "El usuario " + request.getUserEmail() + " ha solicitado un certificado digital.";
+        
+        webSocketController.sendNotificationToAdmin(title, message);
+    }
+
+    /**
+     * Verifica y envía notificaciones de estado al usuario
+     */
+    public void checkAndNotifyUserStatus(String userEmail) {
+        // Verificar si no tiene certificados
+        notifyNoCertificates(userEmail);
+        
+        // Verificar si no tiene documentos
+        notifyNoDocuments(userEmail);
+        
+        // Verificar documentos pendientes
+        notifyPendingDocuments(userEmail);
     }
 } 

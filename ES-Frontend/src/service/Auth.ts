@@ -1,5 +1,6 @@
 import { reactive } from "vue";
 import { webSocketService } from "./WebSocketService";
+import { NotificationTriggerService } from "./NotificationTriggerService";
 
 interface AuthState {
   token: string | null;
@@ -29,6 +30,9 @@ export const authService = {
 
     // Connect to WebSocket for notifications
     webSocketService.connect(token);
+    
+    // Trigger status notifications after login
+    NotificationTriggerService.triggerAfterLogin();
   },
 
   // Clear authentication data
@@ -42,8 +46,16 @@ export const authService = {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
 
-    // Disconnect WebSocket
+    // Disconnect WebSocket and prevent auto-reconnection
     webSocketService.disconnect();
+    
+    // Clear any other stored data
+    sessionStorage.clear();
+    
+    // Clear any cookies if they exist
+    document.cookie.split(";").forEach(function(c) { 
+      document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+    });
   },
 
   // Check if user is authenticated

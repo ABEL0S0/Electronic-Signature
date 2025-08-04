@@ -31,7 +31,7 @@ public class CertificateRequestService {
         
         // Enviar notificaciones
         emailService.sendCertificateRequestNotification(savedRequest);
-        notificationService.sendCertificateRequestNotification(savedRequest);
+        notificationService.notifyAdminNewCertificateRequest(savedRequest);
         
         return savedRequest;
     }
@@ -74,7 +74,7 @@ public class CertificateRequestService {
 
         // Enviar notificaciones al usuario
         emailService.sendCertificateApprovedNotification(updatedRequest);
-        notificationService.sendCertificateApprovedNotification(updatedRequest);
+        notificationService.notifyCertificateApproved(updatedRequest);
 
         return updatedRequest;
     }
@@ -96,7 +96,7 @@ public class CertificateRequestService {
 
         // Enviar notificaciones al usuario
         emailService.sendCertificateRejectedNotification(updatedRequest);
-        notificationService.sendCertificateRejectedNotification(updatedRequest);
+        notificationService.notifyCertificateRejected(updatedRequest);
 
         return updatedRequest;
     }

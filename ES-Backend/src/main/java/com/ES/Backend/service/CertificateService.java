@@ -45,6 +45,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.ES.Backend.entity.Certificate;
 import com.ES.Backend.repository.CertificateRepository;
+import com.ES.Backend.service.NotificationService;
 
 import jakarta.annotation.PostConstruct;
 
@@ -53,14 +54,16 @@ import jakarta.annotation.PostConstruct;
 public class CertificateService {
     private final CertificateRepository repository;
     private final CryptoService cryptoService;
+    private final NotificationService notificationService;
     private PrivateKey caPrivateKey;
     private X509Certificate caCertificate;
     
 
-    public CertificateService(CertificateRepository repository, CryptoService cryptoService) {
+    public CertificateService(CertificateRepository repository, CryptoService cryptoService, NotificationService notificationService) {
         Security.addProvider(new BouncyCastleProvider());
         this.repository = repository;
         this.cryptoService = cryptoService;
+        this.notificationService = notificationService;
         try {
             // Generar CA en código
             KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA");
@@ -303,6 +306,9 @@ public class CertificateService {
 
         // 4. Guardar en la base de datos
         guardarCertificadoEnDB(username, p12Bytes, password);
+        
+        // 5. Verificar y enviar notificaciones de estado
+        notificationService.checkAndNotifyUserStatus(username);
     }
 
     private String bytesToHex(byte[] bytes) {

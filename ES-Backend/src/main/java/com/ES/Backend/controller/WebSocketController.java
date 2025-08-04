@@ -1,6 +1,8 @@
 package com.ES.Backend.controller;
 
 import com.ES.Backend.service.JwtService;
+import com.ES.Backend.service.UserService;
+import com.ES.Backend.entity.User;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,10 +21,14 @@ public class WebSocketController extends TextWebSocketHandler {
     private static final Map<String, WebSocketSession> sessions = new ConcurrentHashMap<>();
     private static final Map<String, String> userTokens = new ConcurrentHashMap<>();
     private static final Map<String, String> sessionToUser = new ConcurrentHashMap<>(); // sessionId -> userEmail
+    private static final Map<String, String> sessionToUserRole = new ConcurrentHashMap<>(); // sessionId -> userRole
     private static final Map<String, Set<String>> userToSessions = new ConcurrentHashMap<>(); // userEmail -> Set<sessionId>
     
     @Autowired
     private JwtService jwtService;
+    
+    @Autowired
+    private UserService userService;
     
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -48,35 +54,49 @@ public class WebSocketController extends TextWebSocketHandler {
             if (payload.startsWith("{")) {
                 JsonNode json = objectMapper.readTree(payload);
                 
-                // Manejar mensaje de autenticación
+                // Manejar mensaje de autenticación (requerido)
                 if (json.has("type") && "AUTH".equals(json.get("type").asText())) {
                     String token = json.get("token").asText();
                     String userEmail = jwtService.extractUser(token);
                     
+                    // Obtener información completa del usuario incluyendo el rol
+                    User user = userService.findByEmail(userEmail);
+                    String userRole = user.getRole();
+                    
                     // Registrar la sesión del usuario
                     sessionToUser.put(sessionId, userEmail);
+                    sessionToUserRole.put(sessionId, userRole);
                     userTokens.put(sessionId, token);
                     
                     // Agregar sesión al mapeo de usuario
                     userToSessions.computeIfAbsent(userEmail, k -> ConcurrentHashMap.newKeySet()).add(sessionId);
                     
-                    System.out.println("🔐 Usuario autenticado: " + userEmail + " en sesión: " + sessionId);
+                    System.out.println("🔐 Usuario autenticado: " + userEmail + " (Rol: " + userRole + ") en sesión: " + sessionId);
                     System.out.println("📊 Sesiones activas para " + userEmail + ": " + userToSessions.get(userEmail).size());
                     
                     // Confirmar autenticación
-                    session.sendMessage(new TextMessage("{\"type\":\"AUTH_SUCCESS\",\"message\":\"Autenticación exitosa\",\"userEmail\":\"" + userEmail + "\"}"));
+                    session.sendMessage(new TextMessage("{\"type\":\"AUTH_SUCCESS\",\"message\":\"Autenticación exitosa\",\"userEmail\":\"" + userEmail + "\",\"userRole\":\"" + userRole + "\"}"));
                     return;
                 }
                 
-                // Otros tipos de mensajes
-                session.sendMessage(new TextMessage("Mensaje JSON procesado: " + payload));
+                // Verificar si el usuario está autenticado para otros mensajes
+                String userEmail = sessionToUser.get(sessionId);
+                if (userEmail == null) {
+                    session.sendMessage(new TextMessage("{\"type\":\"ERROR\",\"message\":\"Usuario no autenticado\"}"));
+                    return;
+                }
+                
+                // Manejar otros tipos de mensajes aquí si es necesario
+                session.sendMessage(new TextMessage("{\"type\":\"MESSAGE_RECEIVED\",\"message\":\"Mensaje procesado correctamente\"}"));
+                
             } else {
-                // Es un mensaje simple, echo
-                session.sendMessage(new TextMessage("Echo: " + payload));
+                // Mensaje de texto plano
+                session.sendMessage(new TextMessage("{\"type\":\"ECHO\",\"message\":\"" + payload + "\"}"));
             }
+            
         } catch (Exception e) {
-            System.err.println("❌ Error procesando mensaje de " + sessionId + ": " + e.getMessage());
-            session.sendMessage(new TextMessage("Error: " + e.getMessage()));
+            System.err.println("❌ Error procesando mensaje: " + e.getMessage());
+            session.sendMessage(new TextMessage("{\"type\":\"ERROR\",\"message\":\"Error procesando mensaje: " + e.getMessage() + "\"}"));
         }
     }
 
@@ -85,36 +105,32 @@ public class WebSocketController extends TextWebSocketHandler {
         String sessionId = session.getId();
         String userEmail = sessionToUser.get(sessionId);
         
-        System.out.println("❌ Conexión WebSocket cerrada: " + sessionId);
-        System.out.println("   - Usuario: " + (userEmail != null ? userEmail : "Desconocido"));
-        System.out.println("   - Código: " + status.getCode());
-        System.out.println("   - Razón: " + status.getReason());
+        System.out.println("❌ Conexión WebSocket cerrada: " + sessionId + " - Usuario: " + userEmail);
         
-        // Limpiar sesión
+        // Limpiar datos de la sesión
         sessions.remove(sessionId);
         userTokens.remove(sessionId);
         sessionToUser.remove(sessionId);
+        sessionToUserRole.remove(sessionId);
         
-        // Limpiar de múltiples sesiones del usuario
+        // Remover sesión del mapeo de usuario
         if (userEmail != null) {
             Set<String> userSessions = userToSessions.get(userEmail);
             if (userSessions != null) {
                 userSessions.remove(sessionId);
                 if (userSessions.isEmpty()) {
                     userToSessions.remove(userEmail);
-                    System.out.println("👤 Usuario " + userEmail + " ya no tiene sesiones activas");
-                } else {
-                    System.out.println("📊 Usuario " + userEmail + " tiene " + userSessions.size() + " sesiones activas restantes");
                 }
             }
         }
     }
 
+    /**
+     * Envía notificación a un usuario específico
+     */
     public void sendNotificationToUser(String userEmail, String title, String message) {
-        // Encontrar todas las sesiones del usuario específico y enviar notificación
         Set<String> userSessions = userToSessions.get(userEmail);
         if (userSessions != null && !userSessions.isEmpty()) {
-            int sentCount = 0;
             for (String sessionId : userSessions) {
                 WebSocketSession session = sessions.get(sessionId);
                 if (session != null && session.isOpen()) {
@@ -124,41 +140,49 @@ public class WebSocketController extends TextWebSocketHandler {
                             title, message, java.time.Instant.now()
                         );
                         session.sendMessage(new TextMessage(notification));
-                        sentCount++;
-                        System.out.println("✅ Notificación enviada a usuario " + userEmail + " en sesión " + sessionId);
                     } catch (Exception e) {
                         System.err.println("❌ Error enviando notificación a " + userEmail + " en sesión " + sessionId + ": " + e.getMessage());
                     }
                 }
             }
-            System.out.println("📊 Notificación enviada a " + sentCount + " sesiones de " + userEmail);
-        } else {
-            System.out.println("⚠️ Usuario " + userEmail + " no está conectado. Notificación no enviada.");
         }
     }
 
+    /**
+     * Envía notificación solo a usuarios con rol ADMIN
+     */
     public void sendNotificationToAdmin(String title, String message) {
-        // Enviar notificación a todos los administradores conectados
-        int sentCount = 0;
         for (Map.Entry<String, WebSocketSession> entry : sessions.entrySet()) {
-            try {
-                String notification = String.format(
-                    "{\"type\":\"NOTIFICATION\",\"target\":\"ADMIN\",\"title\":\"%s\",\"message\":\"%s\",\"timestamp\":\"%s\"}",
-                    title, message, java.time.Instant.now()
-                );
-                entry.getValue().sendMessage(new TextMessage(notification));
-                sentCount++;
-            } catch (Exception e) {
-                System.err.println("Error enviando notificación: " + e.getMessage());
+            String sessionId = entry.getKey();
+            WebSocketSession session = entry.getValue();
+            
+            // Verificar si el usuario de esta sesión tiene rol ADMIN
+            String userRole = sessionToUserRole.get(sessionId);
+            if ("ADMIN".equals(userRole) && session.isOpen()) {
+                try {
+                    String notification = String.format(
+                        "{\"type\":\"NOTIFICATION\",\"target\":\"ADMIN\",\"title\":\"%s\",\"message\":\"%s\",\"timestamp\":\"%s\"}",
+                        title, message, java.time.Instant.now()
+                    );
+                    session.sendMessage(new TextMessage(notification));
+                } catch (Exception e) {
+                    System.err.println("❌ Error enviando notificación de admin a sesión " + sessionId + ": " + e.getMessage());
+                }
             }
         }
-        System.out.println("📊 Notificación enviada a " + sentCount + " administradores");
     }
 
-    @Override
-    public void handleTransportError(WebSocketSession session, Throwable exception) throws Exception {
-        System.err.println("🚨 Error de transporte WebSocket para sesión " + session.getId() + ": " + exception.getMessage());
-        exception.printStackTrace();
+    /**
+     * Obtiene el número de sesiones activas
+     */
+    public int getActiveSessionsCount() {
+        return sessions.size();
     }
 
+    /**
+     * Obtiene el número de usuarios únicos conectados
+     */
+    public int getUniqueUsersCount() {
+        return userToSessions.size();
+    }
 } 

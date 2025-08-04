@@ -11,6 +11,7 @@ import org.springframework.http.HttpStatus;
 
 import com.ES.Backend.entity.DocumentMetadata;
 import com.ES.Backend.repository.DocumentMetadataRepository;
+import com.ES.Backend.service.NotificationService;
 
 import java.io.File;
 import java.io.IOException;
@@ -25,12 +26,14 @@ import java.util.UUID;
 public class DocumentMetadataService {
 
     private final DocumentMetadataRepository repository;
+    private final NotificationService notificationService;
 
     @Value("${upload.path}")
     private String uploadPath;
 
-    public DocumentMetadataService(DocumentMetadataRepository repository) {
+    public DocumentMetadataService(DocumentMetadataRepository repository, NotificationService notificationService) {
         this.repository = repository;
+        this.notificationService = notificationService;
     }
 
     public DocumentMetadata saveDocument(MultipartFile file, String user) throws IOException {
@@ -50,7 +53,12 @@ public class DocumentMetadataService {
         metadata.setFilePath(fullPath);
         metadata.setUploadedAt(LocalDateTime.now());
 
-        return repository.save(metadata);
+        DocumentMetadata savedMetadata = repository.save(metadata);
+        
+        // Verificar y enviar notificaciones de estado
+        notificationService.checkAndNotifyUserStatus(user);
+        
+        return savedMetadata;
     }
 
     public List<DocumentMetadata> getDocumentsByUser(String user) {

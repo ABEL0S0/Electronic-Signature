@@ -16,11 +16,11 @@ class WebSocketService {
     webSocketManager.disconnect();
   }
 
-  addListener(type: 'user' | 'admin', callback: (message: NotificationMessage) => void) {
+  addListener(type: 'user' | 'admin' | 'auth_success', callback: (message: NotificationMessage | any) => void) {
     webSocketManager.addListener(type, callback);
   }
 
-  removeListener(type: 'user' | 'admin') {
+  removeListener(type: 'user' | 'admin' | 'auth_success') {
     webSocketManager.removeListener(type);
   }
 

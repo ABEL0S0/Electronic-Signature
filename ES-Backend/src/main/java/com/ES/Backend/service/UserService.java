@@ -104,4 +104,12 @@ public class UserService implements UserDetailsService {
         return userRepository.save(user);
     }
     
+    /**
+     * Busca un usuario por su email
+     */
+    public User findByEmail(String email) {
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
+    }
+    
 } 

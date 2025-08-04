@@ -7,10 +7,15 @@ class WebSocketManager {
     this.maxReconnectAttempts = 5;
     this.listeners = new Map();
     this.token = '';
+    this.manualDisconnect = false; // Flag to prevent auto-reconnection after manual disconnect
   }
 
   async connect(token) {
     if (this.isConnected) return;
+    
+    // Reset manual disconnect flag when connecting with a new token
+    this.manualDisconnect = false;
+    this.reconnectAttempts = 0;
     
     this.token = token;
     console.log('🔌 Intentando conectar WebSocket...');
@@ -66,6 +71,8 @@ class WebSocketManager {
         console.log('✅ Conexión WebSocket confirmada:', parsedData.message);
       } else if (parsedData.type === 'AUTH_SUCCESS') {
         console.log('🔐 Autenticación exitosa:', parsedData.message, 'Usuario:', parsedData.userEmail);
+        // Notificar que la autenticación fue exitosa
+        this.notifyListeners('auth_success', { userEmail: parsedData.userEmail, userRole: parsedData.userRole });
       } else if (parsedData.type === 'NOTIFICATION') {
         console.log('🔔 Notificación recibida:', parsedData);
         const notification = {
@@ -98,6 +105,12 @@ class WebSocketManager {
   }
 
   attemptReconnect() {
+    // Don't attempt to reconnect if manually disconnected
+    if (this.manualDisconnect) {
+      console.log('🔌 Reconexión cancelada - desconexión manual activa');
+      return;
+    }
+    
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
       this.reconnectAttempts++;
       console.log(`🔄 Intentando reconectar WebSocket... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
@@ -111,15 +124,23 @@ class WebSocketManager {
   }
 
   disconnect() {
+    this.manualDisconnect = true; // Set flag to prevent auto-reconnection
+    this.reconnectAttempts = 0; // Reset reconnect attempts
+    
     if (this.socket) {
       this.socket.close();
       this.socket = null;
       this.isConnected = false;
       console.log('🔌 WebSocket desconectado manualmente');
     }
+    
+    // Clear all listeners
+    this.listeners.clear();
   }
 
   addListener(type, callback) {
+    // Si ya existe un listener para este tipo, lo removemos primero
+    this.listeners.delete(type);
     this.listeners.set(type, callback);
   }
 

@@ -7,6 +7,9 @@ import RequestSignature from '../components/RequestSignature.vue';
 import CertificateRequestForm from '../components/CertificateRequestForm.vue';
 import AdminCertificateRequests from '../components/AdminCertificateRequests.vue';
 import NotificationToast from '../components/NotificationToast.vue';
+import NotificationList from '../components/NotificationList.vue';
+
+
 import { authState, authService } from '../service/Auth';
 import { getDocumentsByUser } from '../utils/api';
 
@@ -25,6 +28,8 @@ const quickActions = computed(() => {
     { icon: 'upload', label: 'Subir Documento', action: () => (activeSection.value = 'upload') },
     { icon: 'pen', label: 'Firmar Ahora', action: () => (activeSection.value = 'sign') },
     { icon: 'file', label: 'Ver Documentos', action: () => (activeSection.value = 'documents') },
+
+
   ];
 
   // Agregar acción de solicitar certificado para usuarios normales
@@ -83,7 +88,14 @@ const getUserFullName = () => {
 
 // —– Logout —–
 function handleSignOut() {
+  // Limpiar todos los datos de autenticación
   authService.clearAuth();
+  
+  // Limpiar cualquier estado local del componente
+  documents.value = [];
+  activeSection.value = 'dashboard';
+  
+  // Redirigir al login
   window.location.hash = "/";
 }
 
@@ -113,6 +125,10 @@ onMounted(() => {
     activeSection.value = 'request';
   });
 });
+
+
+
+
 </script>
 
 <template>
@@ -138,10 +154,7 @@ onMounted(() => {
           </div>
           <!-- User Actions -->
           <div class="flex items-center space-x-4">
-            <button class="relative bg-transparent p-2 rounded-full hover:bg-emerald-50">
-              <span v-html="renderIcon('bell', 'w-5 h-5 text-slate-600')"></span>
-              <span class="absolute -top-1 -right-1 w-5 h-5 p-0 bg-emerald-500 text-white text-xs flex items-center justify-center rounded-full">3</span>
-            </button>
+            <NotificationList />
             <button class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded hidden sm:flex items-center" @click="activeSection = 'upload'">
               <span v-html="renderIcon('plus', 'w-4 h-4 mr-2')"></span>
               Nuevo
@@ -302,6 +315,8 @@ onMounted(() => {
           <MyDocuments v-else-if="activeSection === 'documents'" />
           <CertificateRequestForm v-else-if="activeSection === 'certificate-request'" />
           <AdminCertificateRequests v-else-if="activeSection === 'admin-requests'" />
+        
+
         </div>
       </main>
     </div>
