@@ -1,15 +1,18 @@
 <script setup lang="ts">
-import { ref, shallowRef, onMounted } from 'vue';
+import { ref, shallowRef, onMounted, computed } from 'vue';
 import axios from 'axios';
 import { getDocumentsByUser, uploadDocument, getCertificatesByUser } from '../utils/api';
+import { 
+  convertToBackendPage, 
+  convertCanvasToPDFCoordinates, 
+  calculateSignatureBox 
+} from '../utils/pyhanko-conversions';
+import { validatePassword } from '../utils/password-validation';
 import firmaImg from '../assets/firma.png';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf';
 
 // Configurar el worker correctamente
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/legacy/build/pdf.worker.js',
-  import.meta.url
-).toString();
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
 // Tipos para TypeScript
 interface Document {
@@ -50,6 +53,13 @@ const allDocuments = ref<Document[]>([]);
 const recentlySigned = ref<Document[]>([]);
 const fileInput = ref<HTMLInputElement | null>(null);
 
+// Validación de contraseña del certificado
+const certificatePasswordValidation = computed(() => validatePassword(signForm.value.certPassword));
+const isCertificatePasswordValid = computed(() => certificatePasswordValidation.value.isValid);
+const certificatePasswordStrength = computed(() => certificatePasswordValidation.value.strength);
+const certificatePasswordScore = computed(() => certificatePasswordValidation.value.score);
+const certificatePasswordColor = computed(() => certificatePasswordValidation.value.color);
+
 // PDF.js variables - usando shallowRef para el documento PDF
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 const pdfDoc = shallowRef<pdfjsLib.PDFDocumentProxy | null>(null);
@@ -61,45 +71,11 @@ const signaturePosition = ref<SignaturePosition | null>(null);
 // Asegurar que currentPage siempre sea válido
 const getCurrentPage = () => Math.max(1, currentPage.value);
 
-// Convertir de 1-based (frontend) a 0-based (backend)
-const convertToBackendPage = (page: number) => page - 1;
-
-// Convertir coordenadas del canvas al sistema PDF estándar
-const convertCanvasToPDFCoordinates = (canvasX: number, canvasY: number, canvasWidth: number, canvasHeight: number, pageWidth: number, pageHeight: number) => {
-  // Convertir coordenadas del canvas (0,0 en esquina superior izquierda, Y hacia abajo)
-  // al sistema PDF (0,0 en esquina inferior izquierda, Y hacia arriba)
-  
-  // X: se mantiene igual (crece hacia la derecha en ambos sistemas)
-  const pdfX = (canvasX / canvasWidth) * pageWidth;
-  
-  // Y: invertir el eje Y (canvas Y hacia abajo -> PDF Y hacia arriba)
-  const pdfY = pageHeight - ((canvasY / canvasHeight) * pageHeight);
-  
-  return { x: Math.round(pdfX), y: Math.round(pdfY) };
-};
-
-// Calcular las coordenadas de la caja de firma para PyHanko
-const calculateSignatureBox = (centerX: number, centerY: number, signatureWidth: number = 120, signatureHeight: number = 60) => {
-  // PyHanko usa box = (x1, y1, x2, y2) donde:
-  // (x1, y1) = esquina inferior izquierda
-  // (x2, y2) = esquina superior derecha
-  
-  const halfWidth = signatureWidth / 2;
-  const halfHeight = signatureHeight / 2;
-  
-  const x1 = centerX - halfWidth; // esquina inferior izquierda X
-  const y1 = centerY - halfHeight; // esquina inferior izquierda Y
-  const x2 = centerX + halfWidth; // esquina superior derecha X
-  const y2 = centerY + halfHeight; // esquina superior derecha Y
-  
-  return { x1, y1, x2, y2 };
-};
-
 // Variables para arrastre de firma
 const isDragging = ref(false);
 const dragOffset = ref({ x: 0, y: 0 });
 
-console.log('PDF.js configured with local worker');
+console.log('PDF.js configured with CDN worker');
 
 function getToken() {
   return localStorage.getItem('token');
@@ -353,6 +329,11 @@ async function handleSignDocument() {
     return;
   }
   
+  if (!isCertificatePasswordValid.value) {
+    signStatus.value = 'La contraseña del certificado no cumple con los requisitos de seguridad';
+    return;
+  }
+  
   if (!signaturePosition.value) {
     signStatus.value = 'Debes seleccionar una posición para la firma';
     return;
@@ -497,6 +478,102 @@ function isDocumentSigned(documentId: string): boolean {
               </option>
             </select>
                          <input v-model="signForm.certPassword" type="password" placeholder="Contraseña del certificado" class="block w-full border rounded p-2" required />
+                         
+                         <!-- Indicador de fortaleza de contraseña del certificado -->
+                         <div v-if="signForm.certPassword" class="mt-3 p-3 bg-gray-50 rounded-lg border">
+                           <div class="flex items-center justify-between mb-2">
+                             <span class="text-sm font-medium text-gray-700">Fortaleza de la contraseña:</span>
+                             <span :class="['text-sm font-semibold', certificatePasswordColor]">{{ certificatePasswordStrength }}</span>
+                           </div>
+                           
+                           <!-- Barra de progreso -->
+                           <div class="w-full bg-gray-200 rounded-full h-2 mb-3">
+                             <div 
+                               :class="['h-2 rounded-full transition-all duration-300', 
+                                 certificatePasswordScore < 40 ? 'bg-red-500' : 
+                                 certificatePasswordScore < 60 ? 'bg-orange-500' : 
+                                 certificatePasswordScore < 80 ? 'bg-yellow-500' : 
+                                 certificatePasswordScore < 90 ? 'bg-blue-500' : 'bg-green-500']"
+                               :style="{ width: certificatePasswordScore + '%' }"
+                             ></div>
+                           </div>
+                           
+                           <!-- Puntuación -->
+                           <div class="text-xs text-gray-500 mb-3">
+                             Puntuación: {{ certificatePasswordScore }}/100
+                           </div>
+                           
+                           <!-- Requisitos -->
+                           <div class="space-y-1">
+                             <div class="flex items-center text-sm">
+                               <span :class="['w-4 h-4 mr-2 rounded-full', certificatePasswordValidation.requirements.minLength ? 'bg-green-500' : 'bg-red-500']">
+                                 <svg v-if="certificatePasswordValidation.requirements.minLength" class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                   <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                                 </svg>
+                                 <svg v-else class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                   <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                                 </svg>
+                               </span>
+                               Mínimo 8 caracteres
+                             </div>
+                             <div class="flex items-center text-sm">
+                               <span :class="['w-4 h-4 mr-2 rounded-full', certificatePasswordValidation.requirements.hasUppercase ? 'bg-green-500' : 'bg-red-500']">
+                                 <svg v-if="certificatePasswordValidation.requirements.hasUppercase" class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                   <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                                 </svg>
+                                 <svg v-else class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                   <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                                 </svg>
+                               </span>
+                               Al menos 1 letra mayúscula
+                             </div>
+                             <div class="flex items-center text-sm">
+                               <span :class="['w-4 h-4 mr-2 rounded-full', certificatePasswordValidation.requirements.hasLowercase ? 'bg-green-500' : 'bg-red-500']">
+                                 <svg v-if="certificatePasswordValidation.requirements.hasLowercase" class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                   <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                                 </svg>
+                                 <svg v-else class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                   <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                                 </svg>
+                               </span>
+                               Al menos 1 letra minúscula
+                             </div>
+                             <div class="flex items-center text-sm">
+                               <span :class="['w-4 h-4 mr-2 rounded-full', certificatePasswordValidation.requirements.hasNumber ? 'bg-green-500' : 'bg-red-500']">
+                                 <svg v-if="certificatePasswordValidation.requirements.hasNumber" class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                   <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                                 </svg>
+                                 <svg v-else class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                   <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                                 </svg>
+                               </span>
+                               Al menos 1 número
+                             </div>
+                             <div class="flex items-center text-sm">
+                               <span :class="['w-4 h-4 mr-2 rounded-full', certificatePasswordValidation.requirements.hasSpecialChar ? 'bg-green-500' : 'bg-red-500']">
+                                 <svg v-if="certificatePasswordValidation.requirements.hasSpecialChar" class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                   <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                                 </svg>
+                                 <svg v-else class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                   <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                                 </svg>
+                               </span>
+                               Al menos 1 símbolo especial (!@#$%^&*)
+                             </div>
+                           </div>
+                           
+                           <!-- Sugerencias -->
+                           <div v-if="certificatePasswordValidation.feedback.length > 0" class="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded">
+                             <p class="text-xs text-yellow-800 font-medium mb-1">Sugerencias para mejorar:</p>
+                             <ul class="text-xs text-yellow-700 space-y-1">
+                               <li v-for="suggestion in certificatePasswordValidation.feedback" :key="suggestion" class="flex items-center">
+                                 <span class="w-1 h-1 bg-yellow-500 rounded-full mr-2"></span>
+                                 {{ suggestion }}
+                               </li>
+                             </ul>
+                           </div>
+                         </div>
+                         
                           <div class="flex space-x-2">
                <button 
                  type="button" 
@@ -559,7 +636,7 @@ function isDocumentSigned(documentId: string): boolean {
                       <span class="text-sm text-slate-600">Ir a:</span>
                       <select 
                         :value="currentPage" 
-                        @change="(e) => renderPage(Number((e.target as HTMLSelectElement).value))"
+                        @change="(e: Event) => renderPage(Number((e.target as HTMLSelectElement).value))"
                         class="px-3 py-1 border border-slate-300 rounded text-sm"
                       >
                         <option v-for="page in pdfDoc.numPages" :key="page" :value="page">

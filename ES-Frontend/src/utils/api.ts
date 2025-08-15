@@ -175,6 +175,8 @@ export function getUserByEmail(email: string) {
 }
 
 // --- SOLICITUDES DE FIRMA GRUPAL ---
+// NOTA: Las solicitudes de firma ahora se manejan en tiempo real a través de WebSocket
+// Los endpoints HTTP se mantienen para compatibilidad y operaciones iniciales
 export function createSignatureRequest(request: {
   documentPath: string;
   users: Array<{ userId: number; page: number; posX: number; posY: number }>;
@@ -192,7 +194,8 @@ export function getSignatureRequestById(id: number) {
 
 export function responderSolicitudFirma(userResponse: {
   id?: number;
-  signatureRequestId: number;
+  signatureRequest: { id: number }; // Objeto con ID de la solicitud
+  signatureRequestId?: number; // ID directo de la solicitud (opcional, para compatibilidad)
   userId: number;
   page: number;
   posX: number;

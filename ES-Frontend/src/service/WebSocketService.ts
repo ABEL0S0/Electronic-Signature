@@ -6,6 +6,23 @@ export interface NotificationMessage {
   timestamp: string;
 }
 
+export interface SignatureRequestMessage {
+  requestId: number;
+  documentPath: string;
+  documentName: string;
+  page: number;
+  posX: number;
+  posY: number;
+  timestamp: string;
+}
+
+export interface SignatureRequestUpdateMessage {
+  requestId: number;
+  status: string;
+  message: string;
+  timestamp: string;
+}
+
 // Wrapper TypeScript para el WebSocketManager JavaScript
 class WebSocketService {
   connect(token: string) {
@@ -16,11 +33,11 @@ class WebSocketService {
     webSocketManager.disconnect();
   }
 
-  addListener(type: 'user' | 'admin' | 'auth_success', callback: (message: NotificationMessage | any) => void) {
+  addListener(type: 'user' | 'admin' | 'auth_success' | 'signature_request' | 'signature_request_update', callback: (message: NotificationMessage | SignatureRequestMessage | SignatureRequestUpdateMessage | any) => void) {
     webSocketManager.addListener(type, callback);
   }
 
-  removeListener(type: 'user' | 'admin' | 'auth_success') {
+  removeListener(type: 'user' | 'admin' | 'auth_success' | 'signature_request' | 'signature_request_update') {
     webSocketManager.removeListener(type);
   }
 

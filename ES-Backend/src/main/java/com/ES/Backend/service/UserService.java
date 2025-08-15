@@ -114,6 +114,14 @@ public class UserService implements UserDetailsService {
     }
 
     /**
+     * Busca un usuario por su ID
+     */
+    public User findById(Long id) {
+        return userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found with id: " + id));
+    }
+
+    /**
      * Obtiene todos los usuarios
      */
     public List<User> getAllUsers() {

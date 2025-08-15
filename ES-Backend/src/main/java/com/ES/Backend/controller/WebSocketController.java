@@ -3,6 +3,8 @@ package com.ES.Backend.controller;
 import com.ES.Backend.service.JwtService;
 import com.ES.Backend.service.UserService;
 import com.ES.Backend.entity.User;
+import com.ES.Backend.entity.SignatureRequest;
+import com.ES.Backend.entity.SignatureRequestUser;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,6 +25,7 @@ public class WebSocketController extends TextWebSocketHandler {
     private static final Map<String, String> sessionToUser = new ConcurrentHashMap<>(); // sessionId -> userEmail
     private static final Map<String, String> sessionToUserRole = new ConcurrentHashMap<>(); // sessionId -> userRole
     private static final Map<String, Set<String>> userToSessions = new ConcurrentHashMap<>(); // userEmail -> Set<sessionId>
+    private static final Map<String, Long> userEmailToId = new ConcurrentHashMap<>(); // userEmail -> userId
     
     @Autowired
     private JwtService jwtService;
@@ -62,20 +65,22 @@ public class WebSocketController extends TextWebSocketHandler {
                     // Obtener información completa del usuario incluyendo el rol
                     User user = userService.findByEmail(userEmail);
                     String userRole = user.getRole();
+                    Long userId = user.getId();
                     
                     // Registrar la sesión del usuario
                     sessionToUser.put(sessionId, userEmail);
                     sessionToUserRole.put(sessionId, userRole);
                     userTokens.put(sessionId, token);
+                    userEmailToId.put(userEmail, userId);
                     
                     // Agregar sesión al mapeo de usuario
                     userToSessions.computeIfAbsent(userEmail, k -> ConcurrentHashMap.newKeySet()).add(sessionId);
                     
-                    System.out.println("🔐 Usuario autenticado: " + userEmail + " (Rol: " + userRole + ") en sesión: " + sessionId);
+                    System.out.println("🔐 Usuario autenticado: " + userEmail + " (Rol: " + userRole + ", ID: " + userId + ") en sesión: " + sessionId);
                     System.out.println("📊 Sesiones activas para " + userEmail + ": " + userToSessions.get(userEmail).size());
                     
                     // Confirmar autenticación
-                    session.sendMessage(new TextMessage("{\"type\":\"AUTH_SUCCESS\",\"message\":\"Autenticación exitosa\",\"userEmail\":\"" + userEmail + "\",\"userRole\":\"" + userRole + "\"}"));
+                    session.sendMessage(new TextMessage("{\"type\":\"AUTH_SUCCESS\",\"message\":\"Autenticación exitosa\",\"userEmail\":\"" + userEmail + "\",\"userRole\":\"" + userRole + "\",\"userId\":" + userId + "}"));
                     return;
                 }
                 
@@ -120,6 +125,7 @@ public class WebSocketController extends TextWebSocketHandler {
                 userSessions.remove(sessionId);
                 if (userSessions.isEmpty()) {
                     userToSessions.remove(userEmail);
+                    userEmailToId.remove(userEmail);
                 }
             }
         }
@@ -173,6 +179,58 @@ public class WebSocketController extends TextWebSocketHandler {
     }
 
     /**
+     * Envía solicitud de firma a un usuario específico
+     */
+    public void sendSignatureRequestToUser(String userEmail, SignatureRequest request, SignatureRequestUser userRequest) {
+        Set<String> userSessions = userToSessions.get(userEmail);
+        if (userSessions != null && !userSessions.isEmpty()) {
+            for (String sessionId : userSessions) {
+                WebSocketSession session = sessions.get(sessionId);
+                if (session != null && session.isOpen()) {
+                    try {
+                        String signatureRequest = String.format(
+                            "{\"type\":\"SIGNATURE_REQUEST\",\"requestId\":%d,\"documentPath\":\"%s\",\"documentName\":\"%s\",\"page\":%d,\"posX\":%d,\"posY\":%d,\"timestamp\":\"%s\"}",
+                            request.getId(),
+                            request.getDocumentPath(),
+                            request.getDocumentPath().substring(request.getDocumentPath().lastIndexOf("/") + 1),
+                            userRequest.getPage(),
+                            userRequest.getPosX(),
+                            userRequest.getPosY(),
+                            java.time.Instant.now()
+                        );
+                        session.sendMessage(new TextMessage(signatureRequest));
+                    } catch (Exception e) {
+                        System.err.println("❌ Error enviando solicitud de firma a " + userEmail + " en sesión " + sessionId + ": " + e.getMessage());
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Envía actualización de estado de solicitud de firma
+     */
+    public void sendSignatureRequestUpdate(String userEmail, Long requestId, String status, String message) {
+        Set<String> userSessions = userToSessions.get(userEmail);
+        if (userSessions != null && !userSessions.isEmpty()) {
+            for (String sessionId : userSessions) {
+                WebSocketSession session = sessions.get(sessionId);
+                if (session != null && session.isOpen()) {
+                    try {
+                        String update = String.format(
+                            "{\"type\":\"SIGNATURE_REQUEST_UPDATE\",\"requestId\":%d,\"status\":\"%s\",\"message\":\"%s\",\"timestamp\":\"%s\"}",
+                            requestId, status, message, java.time.Instant.now()
+                        );
+                        session.sendMessage(new TextMessage(update));
+                    } catch (Exception e) {
+                        System.err.println("❌ Error enviando actualización de solicitud a " + userEmail + " en sesión " + sessionId + ": " + e.getMessage());
+                    }
+                }
+            }
+        }
+    }
+
+    /**
      * Obtiene el número de sesiones activas
      */
     public int getActiveSessionsCount() {
@@ -184,5 +242,12 @@ public class WebSocketController extends TextWebSocketHandler {
      */
     public int getUniqueUsersCount() {
         return userToSessions.size();
+    }
+
+    /**
+     * Obtiene el ID de usuario por email
+     */
+    public Long getUserIdByEmail(String userEmail) {
+        return userEmailToId.get(userEmail);
     }
 } 
