@@ -8,6 +8,8 @@ import CertificateRequestForm from '../components/CertificateRequestForm.vue';
 import AdminCertificateRequests from '../components/AdminCertificateRequests.vue';
 import NotificationToast from '../components/NotificationToast.vue';
 import NotificationList from '../components/NotificationList.vue';
+import RequestGroupSignature from '../components/RequestGroupSignature.vue';
+import PendingSignatureRequests from '../components/PendingSignatureRequests.vue';
 
 
 import { authState, authService } from '../service/Auth';
@@ -28,8 +30,8 @@ const quickActions = computed(() => {
     { icon: 'upload', label: 'Subir Documento', action: () => (activeSection.value = 'upload') },
     { icon: 'pen', label: 'Firmar Ahora', action: () => (activeSection.value = 'sign') },
     { icon: 'file', label: 'Ver Documentos', action: () => (activeSection.value = 'documents') },
-
-
+    { icon: 'users', label: 'Solicitar Firma Grupal', action: () => (activeSection.value = 'group-signature') },
+    { icon: 'zap', label: 'Solicitudes de Firma', action: () => (activeSection.value = 'pending-signature') },
   ];
 
   // Agregar acción de solicitar certificado para usuarios normales
@@ -197,6 +199,14 @@ onMounted(() => {
             <span v-html="renderIcon('users', 'w-5 h-5 mr-3')"></span>
             Gestionar Solicitudes
           </button>
+          <button :class="['w-full justify-start flex items-center px-4 py-2 rounded', activeSection === 'group-signature' ? 'bg-emerald-600 text-white' : 'hover:bg-emerald-50 text-slate-700']" @click="activeSection = 'group-signature'">
+            <span v-html="renderIcon('users', 'w-5 h-5 mr-3')"></span>
+            Solicitar Firma Grupal
+          </button>
+          <button :class="['w-full justify-start flex items-center px-4 py-2 rounded', activeSection === 'pending-signature' ? 'bg-emerald-600 text-white' : 'hover:bg-emerald-50 text-slate-700']" @click="activeSection = 'pending-signature'">
+            <span v-html="renderIcon('zap', 'w-5 h-5 mr-3')"></span>
+            Solicitudes de Firma
+          </button>
         </nav>
         <!-- User Card -->
         <div class="mt-8 border-0 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-xl p-4">
@@ -315,8 +325,8 @@ onMounted(() => {
           <MyDocuments v-else-if="activeSection === 'documents'" />
           <CertificateRequestForm v-else-if="activeSection === 'certificate-request'" />
           <AdminCertificateRequests v-else-if="activeSection === 'admin-requests'" />
-        
-
+          <RequestGroupSignature v-else-if="activeSection === 'group-signature'" />
+          <PendingSignatureRequests v-else-if="activeSection === 'pending-signature'" />
         </div>
       </main>
     </div>

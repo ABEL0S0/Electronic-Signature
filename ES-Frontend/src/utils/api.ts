@@ -165,4 +165,47 @@ export function rejectCertificateRequest(id: number, reason: string) {
   return api.put(`/api/certificate-requests/${id}/reject`, { reason });
 }
 
+// --- USUARIOS ---
+export function getAllUsers() {
+  return api.get('/api/users');
+}
+
+export function getUserByEmail(email: string) {
+  return api.get('/api/users/search', { params: { email } });
+}
+
+// --- SOLICITUDES DE FIRMA GRUPAL ---
+export function createSignatureRequest(request: {
+  documentPath: string;
+  users: Array<{ userId: number; page: number; posX: number; posY: number }>;
+}) {
+  return api.post('/api/signature-requests', request);
+}
+
+export function getAllSignatureRequests() {
+  return api.get('/api/signature-requests');
+}
+
+export function getSignatureRequestById(id: number) {
+  return api.get(`/api/signature-requests/${id}`);
+}
+
+export function responderSolicitudFirma(userResponse: {
+  id?: number;
+  signatureRequestId: number;
+  userId: number;
+  page: number;
+  posX: number;
+  posY: number;
+  status: string;
+  certificateId?: string;
+  certificatePassword?: string;
+}) {
+  return api.post('/api/signature-requests/user-response', userResponse);
+}
+
+export function getUsersBySignatureRequest(signatureRequestId: number) {
+  return api.get(`/api/signature-requests/${signatureRequestId}/users`);
+}
+
 export { api };
