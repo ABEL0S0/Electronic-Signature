@@ -165,4 +165,50 @@ export function rejectCertificateRequest(id: number, reason: string) {
   return api.put(`/api/certificate-requests/${id}/reject`, { reason });
 }
 
+// --- USUARIOS ---
+export function getAllUsers() {
+  return api.get('/api/users');
+}
+
+export function getUserByEmail(email: string) {
+  return api.get('/api/users/search', { params: { email } });
+}
+
+// --- SOLICITUDES DE FIRMA GRUPAL ---
+// NOTA: Las solicitudes de firma ahora se manejan en tiempo real a través de WebSocket
+// Los endpoints HTTP se mantienen para compatibilidad y operaciones iniciales
+export function createSignatureRequest(request: {
+  documentPath: string;
+  users: Array<{ userId: number; page: number; posX: number; posY: number }>;
+}) {
+  return api.post('/api/signature-requests', request);
+}
+
+export function getAllSignatureRequests() {
+  return api.get('/api/signature-requests');
+}
+
+export function getSignatureRequestById(id: number) {
+  return api.get(`/api/signature-requests/${id}`);
+}
+
+export function responderSolicitudFirma(userResponse: {
+  id?: number;
+  signatureRequest: { id: number }; // Objeto con ID de la solicitud
+  signatureRequestId?: number; // ID directo de la solicitud (opcional, para compatibilidad)
+  userId: number;
+  page: number;
+  posX: number;
+  posY: number;
+  status: string;
+  certificateId?: string;
+  certificatePassword?: string;
+}) {
+  return api.post('/api/signature-requests/user-response', userResponse);
+}
+
+export function getUsersBySignatureRequest(signatureRequestId: number) {
+  return api.get(`/api/signature-requests/${signatureRequestId}/users`);
+}
+
 export { api };

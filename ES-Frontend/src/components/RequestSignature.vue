@@ -1,5 +1,6 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
+import { validatePassword } from '../utils/password-validation';
 
 const form = ref({
   nombre: '',
@@ -10,11 +11,25 @@ const form = ref({
 });
 const certStatus = ref('');
 
+// Validación de contraseña del certificado
+const certificatePasswordValidation = computed(() => validatePassword(form.value.password));
+const isCertificatePasswordValid = computed(() => certificatePasswordValidation.value.isValid);
+const certificatePasswordStrength = computed(() => certificatePasswordValidation.value.strength);
+const certificatePasswordScore = computed(() => certificatePasswordValidation.value.score);
+const certificatePasswordColor = computed(() => certificatePasswordValidation.value.color);
+
 function getToken() {
   return localStorage.getItem('token');
 }
+
 async function solicitarCertificado() {
   certStatus.value = '';
+  
+  if (!isCertificatePasswordValid.value) {
+    certStatus.value = 'La contraseña del certificado no cumple con los requisitos de seguridad.';
+    return;
+  }
+  
   try {
     const res = await fetch('/api/certificates/request', {
       method: 'POST',
@@ -47,8 +62,8 @@ async function solicitarCertificado() {
   <div class="space-y-8">
     <div class="flex items-center justify-between">
       <div>
-        <h2 class="text-3xl font-bold text-slate-900">Solicitar Firma Electrónica</h2>
-        <p class="text-slate-600 mt-2">Envía solicitudes de firma a otros usuarios de forma segura</p>
+        <h2 class="text-3xl font-bold text-slate-900">Solicitar Certificado Digital</h2>
+        <p class="text-slate-600 mt-2">Genera tu certificado digital para firmar documentos de forma segura</p>
       </div>
       <span class="bg-emerald-100 text-emerald-700 px-3 py-1 rounded flex items-center font-medium">
         <svg class="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h10a4 4 0 004-4M7 15V7a4 4 0 018 0v8"/></svg>
@@ -98,6 +113,101 @@ async function solicitarCertificado() {
                   Contraseña para .p12
                 </label>
                 <input v-model="form.password" type="password" placeholder="Contraseña del certificado digital" required class="block w-full border border-emerald-200 focus:border-emerald-400 focus:ring-emerald-400 rounded px-3 py-2" />
+                
+                <!-- Indicador de fortaleza de contraseña del certificado -->
+                <div v-if="form.password" class="mt-3 p-3 bg-gray-50 rounded-lg border">
+                  <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm font-medium text-gray-700">Fortaleza de la contraseña:</span>
+                    <span :class="['text-sm font-semibold', certificatePasswordColor]">{{ certificatePasswordStrength }}</span>
+                  </div>
+                  
+                  <!-- Barra de progreso -->
+                  <div class="w-full bg-gray-200 rounded-full h-2 mb-3">
+                    <div 
+                      :class="['h-2 rounded-full transition-all duration-300', 
+                        certificatePasswordScore < 40 ? 'bg-red-500' : 
+                        certificatePasswordScore < 60 ? 'bg-orange-500' : 
+                        certificatePasswordScore < 80 ? 'bg-yellow-500' : 
+                        certificatePasswordScore < 90 ? 'bg-blue-500' : 'bg-green-500']"
+                      :style="{ width: certificatePasswordScore + '%' }"
+                    ></div>
+                  </div>
+                  
+                  <!-- Puntuación -->
+                  <div class="text-xs text-gray-500 mb-3">
+                    Puntuación: {{ certificatePasswordScore }}/100
+                  </div>
+                  
+                  <!-- Requisitos -->
+                  <div class="space-y-1">
+                    <div class="flex items-center text-sm">
+                      <span :class="['w-4 h-4 mr-2 rounded-full', certificatePasswordValidation.requirements.minLength ? 'bg-green-500' : 'bg-red-500']">
+                        <svg v-if="certificatePasswordValidation.requirements.minLength" class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                          <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                        </svg>
+                        <svg v-else class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                          <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                        </svg>
+                      </span>
+                      Mínimo 8 caracteres
+                    </div>
+                    <div class="flex items-center text-sm">
+                      <span :class="['w-4 h-4 mr-2 rounded-full', certificatePasswordValidation.requirements.hasUppercase ? 'bg-green-500' : 'bg-red-500']">
+                        <svg v-if="certificatePasswordValidation.requirements.hasUppercase" class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                          <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                        </svg>
+                        <svg v-else class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                          <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                        </svg>
+                      </span>
+                      Al menos 1 letra mayúscula
+                    </div>
+                    <div class="flex items-center text-sm">
+                      <span :class="['w-4 h-4 mr-2 rounded-full', certificatePasswordValidation.requirements.hasLowercase ? 'bg-green-500' : 'bg-red-500']">
+                        <svg v-if="certificatePasswordValidation.requirements.hasLowercase" class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                          <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                        </svg>
+                        <svg v-else class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                          <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                        </svg>
+                      </span>
+                      Al menos 1 letra minúscula
+                    </div>
+                    <div class="flex items-center text-sm">
+                      <span :class="['w-4 h-4 mr-2 rounded-full', certificatePasswordValidation.requirements.hasNumber ? 'bg-green-500' : 'bg-red-500']">
+                        <svg v-if="certificatePasswordValidation.requirements.hasNumber" class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                          <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                        </svg>
+                        <svg v-else class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                          <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                        </svg>
+                      </span>
+                      Al menos 1 número
+                    </div>
+                    <div class="flex items-center text-sm">
+                      <span :class="['w-4 h-4 mr-2 rounded-full', certificatePasswordValidation.requirements.hasSpecialChar ? 'bg-green-500' : 'bg-red-500']">
+                        <svg v-if="certificatePasswordValidation.requirements.hasSpecialChar" class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                          <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                        </svg>
+                        <svg v-else class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                          <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                        </svg>
+                      </span>
+                      Al menos 1 símbolo especial (!@#$%^&*)
+                    </div>
+                  </div>
+                  
+                  <!-- Sugerencias -->
+                  <div v-if="certificatePasswordValidation.feedback.length > 0" class="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded">
+                    <p class="text-xs text-yellow-800 font-medium mb-1">Sugerencias para mejorar:</p>
+                    <ul class="text-xs text-yellow-700 space-y-1">
+                      <li v-for="suggestion in certificatePasswordValidation.feedback" :key="suggestion" class="flex items-center">
+                        <span class="w-1 h-1 bg-yellow-500 rounded-full mr-2"></span>
+                        {{ suggestion }}
+                      </li>
+                    </ul>
+                  </div>
+                </div>
               </div>
               <div class="space-y-2">
                 <label class="text-slate-700 font-medium">¿Qué deseas hacer con tu certificado?</label>
@@ -106,7 +216,7 @@ async function solicitarCertificado() {
                   <option value="guardar">Guardar en el sistema</option>
                 </select>
               </div>
-              <button type="submit" class="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg">Solicitar Firma</button>
+              <button type="submit" class="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg">Generar Certificado</button>
               <p v-if="certStatus" class="mt-2 text-center" :class="certStatus.includes('correctamente') ? 'text-green-600' : 'text-red-600'">{{ certStatus }}</p>
             </form>
           </div>

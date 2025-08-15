@@ -72,7 +72,7 @@ class WebSocketManager {
       } else if (parsedData.type === 'AUTH_SUCCESS') {
         console.log('🔐 Autenticación exitosa:', parsedData.message, 'Usuario:', parsedData.userEmail);
         // Notificar que la autenticación fue exitosa
-        this.notifyListeners('auth_success', { userEmail: parsedData.userEmail, userRole: parsedData.userRole });
+        this.notifyListeners('auth_success', { userEmail: parsedData.userEmail, userRole: parsedData.userRole, userId: parsedData.userId });
       } else if (parsedData.type === 'NOTIFICATION') {
         console.log('🔔 Notificación recibida:', parsedData);
         const notification = {
@@ -86,6 +86,27 @@ class WebSocketManager {
         } else if (parsedData.target === 'ADMIN') {
           this.notifyListeners('admin', notification);
         }
+      } else if (parsedData.type === 'SIGNATURE_REQUEST') {
+        console.log('📝 Nueva solicitud de firma recibida:', parsedData);
+        const signatureRequest = {
+          requestId: parsedData.requestId,
+          documentPath: parsedData.documentPath,
+          documentName: parsedData.documentName,
+          page: parsedData.page,
+          posX: parsedData.posX,
+          posY: parsedData.posY,
+          timestamp: parsedData.timestamp || new Date().toISOString()
+        };
+        this.notifyListeners('signature_request', signatureRequest);
+      } else if (parsedData.type === 'SIGNATURE_REQUEST_UPDATE') {
+        console.log('🔄 Actualización de solicitud de firma:', parsedData);
+        const update = {
+          requestId: parsedData.requestId,
+          status: parsedData.status,
+          message: parsedData.message,
+          timestamp: parsedData.timestamp || new Date().toISOString()
+        };
+        this.notifyListeners('signature_request_update', update);
       } else {
         console.log('📝 Mensaje de otro tipo:', parsedData);
       }
