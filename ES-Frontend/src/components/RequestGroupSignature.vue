@@ -12,7 +12,10 @@ import firmaImg from '../assets/firma.png';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf';
 
 // Configurar el worker correctamente
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/legacy/build/pdf.worker.js',
+  import.meta.url
+).toString();
 
 const documents = ref([]);
 const users = ref([]);
