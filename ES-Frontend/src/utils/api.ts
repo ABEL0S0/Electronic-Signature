@@ -1,7 +1,7 @@
 import axios from "axios";
 import { authState, authService } from "../service/Auth";
 
-const SERVER_URL = "http://localhost:8080";
+const SERVER_URL = import.meta.env.VITE_API_URL;
 const api = axios.create({
   baseURL: SERVER_URL,
 });

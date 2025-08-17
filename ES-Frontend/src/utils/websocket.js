@@ -1,4 +1,5 @@
 // WebSocket utility para comunicación en tiempo real
+const WS_URL = import.meta.env.VITE_WS_URL;
 class WebSocketManager {
   constructor() {
     this.socket = null;
@@ -33,7 +34,7 @@ class WebSocketManager {
 
   async connectWithWebSocket(token) {
     return new Promise((resolve, reject) => {
-      this.socket = new WebSocket('ws://localhost:8080/ws');
+      this.socket = new WebSocket(WS_URL);
       
       this.socket.onopen = () => {
         console.log('✅ WebSocket conectado exitosamente');

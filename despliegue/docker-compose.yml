@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ..
+      dockerfile: despliegue/Dockerfile.backend
+    container_name: es_backend
+    restart: unless-stopped
+    environment:
+      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL}
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD}
+      SPRING_DATA_MONGODB_URI: ${SPRING_DATA_MONGODB_URI}
+      JWT_SECRET: ${JWT_SECRET}
+      SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME}
+      SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD}
+      SPRING_MAIL_HOST: ${SPRING_MAIL_HOST}
+      SPRING_MAIL_PORT: ${SPRING_MAIL_PORT}
+      FRONTEND_URL: ${FRONTEND_URL}
+    volumes:
+      - backend_uploads:/app/uploads
+    expose:
+      - "8080"
+    networks:
+      - app_network
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: despliegue/Dockerfile.frontend
+    container_name: es_frontend
+    restart: unless-stopped
+    environment:
+      VITE_API_URL: ${VITE_API_URL}
+      VITE_WS_URL: ${VITE_WS_URL}
+    depends_on:
+      - backend
+    expose:
+      - "80"
+    networks:
+      - app_network
+
+  nginx:
+    image: nginx:alpine
+    container_name: es_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/ssl:ro
+      - backend_uploads:/var/www/backend/uploads:ro
+      - frontend_dist:/var/www/frontend/dist:ro
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - app_network
+
+volumes:
+  backend_uploads:
+  frontend_dist:
+
+networks:
+  app_network:
+    driver: bridge
