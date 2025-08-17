@@ -402,110 +402,74 @@ async function submitRequest() {
       </div>
     </div>
 
-    <div class="grid lg:grid-cols-2 gap-8">
-      <!-- Panel izquierdo: Formulario -->
-      <div class="space-y-6">
-        <div class="border-0 shadow-sm bg-white/80 backdrop-blur-sm rounded-xl">
-          <div class="p-6">
-            <h3 class="text-xl font-semibold mb-4">Configuración de Solicitud</h3>
-            
-            <!-- Selección de documento -->
-            <div class="mb-6">
-              <label class="block font-medium mb-2">Selecciona un documento</label>
-              <select 
-                v-model="selectedDocument" 
-                @change="loadSelectedDocument"
-                class="w-full border border-emerald-200 focus:border-emerald-400 focus:ring-emerald-400 rounded px-3 py-2"
-              >
-                <option :value="null">-- Selecciona un documento --</option>
-                <option v-for="doc in documents" :key="doc.id" :value="doc">{{ doc.fileName }}</option>
-              </select>
-            </div>
+         <div class="space-y-6">
+       <!-- Panel principal: Formulario y visualizador -->
+       <div class="border-0 shadow-sm bg-white/80 backdrop-blur-sm rounded-xl">
+         <div class="p-6">
+           <h3 class="text-xl font-semibold mb-4">Configuración de Solicitud</h3>
+           
+           <!-- Selección de documento -->
+           <div class="mb-6">
+             <label class="block font-medium mb-2">Selecciona un documento</label>
+             <select 
+               v-model="selectedDocument" 
+               @change="loadSelectedDocument"
+               class="w-full border border-emerald-200 focus:border-emerald-400 focus:ring-emerald-400 rounded px-3 py-2"
+             >
+               <option :value="null">-- Selecciona un documento --</option>
+               <option v-for="doc in documents" :key="doc.id" :value="doc">{{ doc.fileName }}</option>
+             </select>
+           </div>
 
-            <!-- Búsqueda de usuarios -->
-            <div class="mb-6">
-              <label class="block font-medium mb-2">Buscar usuario</label>
-              <input 
-                v-model="searchQuery" 
-                @input="searchUsers" 
-                placeholder="Nombre, apellido o email" 
-                class="w-full border border-emerald-200 focus:border-emerald-400 focus:ring-emerald-400 rounded px-3 py-2 mb-2" 
-              />
-              <div v-if="userResults.length" class="bg-slate-50 border rounded p-2 max-h-32 overflow-y-auto">
-                <div v-for="user in userResults" :key="user.id" class="flex justify-between items-center py-1">
-                  <span>{{ user.firstName }} {{ user.lastName }} ({{ user.email }})</span>
-                  <button @click="addUser(user)" class="text-emerald-600 hover:underline">Agregar</button>
-                </div>
-              </div>
-            </div>
+           <!-- Búsqueda de usuarios -->
+           <div class="mb-6">
+             <label class="block font-medium mb-2">Buscar usuario</label>
+             <input 
+               v-model="searchQuery" 
+               @input="searchUsers" 
+               placeholder="Nombre, apellido o email" 
+               class="w-full border border-emerald-200 focus:border-emerald-400 focus:ring-emerald-400 rounded px-3 py-2 mb-2" 
+             />
+             <div v-if="userResults.length" class="bg-slate-50 border rounded p-2 max-h-32 overflow-y-auto">
+               <div v-for="user in userResults" :key="user.id" class="flex justify-between items-center py-1">
+                 <span>{{ user.firstName }} {{ user.lastName }} ({{ user.email }})</span>
+                 <button @click="addUser(user)" class="text-emerald-600 hover:underline">Agregar</button>
+               </div>
+             </div>
+           </div>
 
-            <!-- Posición de firma (ahora visual) -->
-            <div class="mb-6">
-              <label class="block font-medium mb-2">Posición de la firma</label>
-              <div class="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <p class="text-sm text-blue-800 mb-2">
-                  <strong>💡 Instrucciones:</strong> Haz clic en el documento para colocar la firma, luego arrastra la imagen para ajustar la posición.
-                </p>
-                <div class="flex space-x-2">
-                  <button 
-                    @click="clearSignaturePosition" 
-                    class="px-3 py-1 bg-slate-500 text-white rounded hover:bg-slate-600 text-sm"
-                  >
-                    Limpiar Posición
-                  </button>
-                </div>
-              </div>
-            </div>
+           <!-- Posición de firma (ahora visual) -->
+           <div class="mb-6">
+             <label class="block font-medium mb-2">Posición de la firma</label>
+             <div class="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+               <p class="text-sm text-blue-800 mb-2">
+                 <strong>💡 Instrucciones:</strong> Haz clic en el documento para colocar la firma, luego arrastra la imagen para ajustar la posición.
+               </p>
+               <div class="flex space-x-2">
+                 <button 
+                   @click="clearSignaturePosition" 
+                   class="px-3 py-1 bg-slate-500 text-white rounded hover:bg-slate-600 text-sm"
+                 >
+                   Limpiar Posición
+                 </button>
+               </div>
+             </div>
+           </div>
 
-            <!-- Usuarios seleccionados -->
-            <div class="mb-6">
-              <h4 class="font-medium mb-2">Usuarios seleccionados</h4>
-              <div v-if="selectedUsers.length === 0" class="text-slate-500 text-sm">No hay usuarios agregados.</div>
-              <div v-else class="space-y-2">
-                <div v-for="u in selectedUsers" :key="u.user.id" class="flex items-center justify-between p-2 bg-slate-50 rounded">
-                  <div>
-                    <span class="font-medium">{{ u.user.firstName }} {{ u.user.lastName }}</span>
-                    <div class="text-xs text-slate-600">{{ u.user.email }}</div>
-                    <div class="text-xs text-slate-500">
-                      Página: {{ u.page }} | Posición: ({{ u.originalPosX }}, {{ u.originalPosY }})
-                    </div>
-                  </div>
-                  <button @click="removeUser(u.user.id)" class="text-red-500 hover:underline text-sm">Quitar</button>
-                </div>
-              </div>
-            </div>
+           <!-- Visualizador de PDF debajo de las instrucciones -->
+           <div class="mb-6">
+             <div v-if="!selectedDocument" class="flex flex-col items-center justify-center py-20 border-2 border-dashed border-slate-300 rounded-lg">
+               <div class="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mb-6">
+                 <svg class="w-12 h-12 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                 </svg>
+               </div>
+               <h4 class="text-lg font-semibold text-slate-900 mb-2">Selecciona un documento</h4>
+               <p class="text-slate-600 text-center">Elige un documento para previsualizarlo y seleccionar la posición de la firma.</p>
+             </div>
 
-            <!-- Botón de envío -->
-            <button 
-              @click="submitRequest" 
-              class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg py-3"
-            >
-              Solicitar Firma
-            </button>
-            
-            <p v-if="status" class="mt-2 text-center" :class="status.includes('correctamente') ? 'text-green-600' : 'text-red-600'">{{ status }}</p>
-          </div>
-        </div>
-      </div>
-
-      <!-- Panel derecho: Visualizador de documento -->
-      <div class="space-y-6">
-        <div class="border-0 shadow-sm bg-white/80 backdrop-blur-sm rounded-xl">
-          <div class="p-6">
-            <h3 class="text-xl font-semibold mb-4">Previsualización del Documento</h3>
-            
-            <div v-if="!selectedDocument" class="flex flex-col items-center justify-center py-20">
-              <div class="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mb-6">
-                <svg class="w-12 h-12 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                </svg>
-              </div>
-              <h4 class="text-lg font-semibold text-slate-900 mb-2">Selecciona un documento</h4>
-              <p class="text-slate-600 text-center">Elige un documento del panel izquierdo para previsualizarlo y seleccionar la posición de la firma.</p>
-            </div>
-
-                         <!-- Visualizador de PDF -->
-             <div v-if="pdfBlobUrl" class="border rounded overflow-hidden p-4 mt-4">
+             <!-- Visualizador de PDF -->
+             <div v-if="pdfBlobUrl" class="border rounded overflow-hidden">
                <!-- PDF Viewer Container -->
                <div class="flex justify-center">
                  <div class="relative" style="cursor: crosshair;">
@@ -587,10 +551,38 @@ async function submitRequest() {
                  </div>
                </div>
              </div>
-          </div>
-        </div>
-      </div>
-    </div>
+           </div>
+
+           <!-- Usuarios seleccionados -->
+           <div class="mb-6">
+             <h4 class="font-medium mb-2">Usuarios seleccionados</h4>
+             <div v-if="selectedUsers.length === 0" class="text-slate-500 text-sm">No hay usuarios agregados.</div>
+             <div v-else class="space-y-2">
+               <div v-for="u in selectedUsers" :key="u.user.id" class="flex items-center justify-between p-2 bg-slate-50 rounded">
+                 <div>
+                   <span class="font-medium">{{ u.user.firstName }} {{ u.user.lastName }}</span>
+                   <div class="text-xs text-slate-600">{{ u.user.email }}</div>
+                   <div class="text-xs text-slate-500">
+                     Página: {{ u.page }} | Posición: ({{ u.originalPosX }}, {{ u.originalPosY }})
+                   </div>
+                 </div>
+                 <button @click="removeUser(u.user.id)" class="text-red-500 hover:underline text-sm">Quitar</button>
+               </div>
+             </div>
+           </div>
+
+           <!-- Botón de envío -->
+           <button 
+             @click="submitRequest" 
+             class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg py-3"
+           >
+             Solicitar Firma
+           </button>
+           
+           <p v-if="status" class="mt-2 text-center" :class="status.includes('correctamente') ? 'text-green-600' : 'text-red-600'">{{ status }}</p>
+         </div>
+       </div>
+     </div>
     
     <!-- Sistema de notificaciones -->
     <div class="fixed top-4 right-4 z-50 space-y-2">
