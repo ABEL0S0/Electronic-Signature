@@ -1,8 +1,22 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, shallowRef } from 'vue';
+import axios from 'axios';
 import { getDocumentsByUser, getAllUsers, createSignatureRequest } from '../utils/api';
 import { authState } from '../service/Auth';
 import { webSocketService } from '../service/WebSocketService';
+import { 
+  convertToBackendPage, 
+  convertCanvasToPDFCoordinates, 
+  calculateSignatureBox 
+} from '../utils/pyhanko-conversions';
+import firmaImg from '../assets/firma.png';
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf';
+
+// Configurar el worker correctamente
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/legacy/build/pdf.worker.js',
+  import.meta.url
+).toString();
 
 const documents = ref([]);
 const users = ref([]);
@@ -14,35 +28,240 @@ const position = ref({ page: 1, posX: 100, posY: 100 });
 const status = ref('');
 const notifications = ref([]);
 
-// Funciones de conversión para PyHanko (similar a SignDocuments.vue)
-// Convertir de 1-based (frontend) a 0-based (backend)
-const convertToBackendPage = (page) => page - 1;
+// Variables para el visualizador de PDF
+const canvasRef = ref(null);
+const pdfDoc = shallowRef(null);
+const currentPage = ref(1);
+const scale = ref(1.5);
+const loading = ref(false);
+const signaturePosition = ref(null);
+const pdfBlobUrl = ref(null);
 
-// Calcular las coordenadas de la caja de firma para PyHanko
-const calculateSignatureBox = (centerX, centerY, signatureWidth = 120, signatureHeight = 60) => {
-  // PyHanko usa box = (x1, y1, x2, y2) donde:
-  // (x1, y1) = esquina inferior izquierda
-  // (x2, y2) = esquina superior derecha
+// Variables para arrastre de firma
+const isDragging = ref(false);
+const dragOffset = ref({ x: 0, y: 0 });
+
+// Asegurar que currentPage siempre sea válido
+const getCurrentPage = () => Math.max(1, currentPage.value);
+
+function getToken() {
+  return localStorage.getItem('token');
+}
+
+// Cleanup function
+function cleanupPDFResources() {
+  if (pdfBlobUrl.value) {
+    URL.revokeObjectURL(pdfBlobUrl.value);
+    pdfBlobUrl.value = null;
+  }
+  pdfDoc.value = null;
+  signaturePosition.value = null;
+}
+
+// Cargar y renderizar el PDF
+async function loadPDF(url) {
+  try {
+    console.log('Loading PDF from URL:', url);
+    
+    const task = pdfjsLib.getDocument(url);
+    pdfDoc.value = await task.promise;
+    
+    console.log('PDF cargado:', pdfDoc.value.numPages, 'páginas');
+    await renderPage(getCurrentPage());
+  } catch (error) {
+    console.error('Error al cargar PDF:', error);
+    throw error;
+  }
+}
+
+// Renderizar una página
+async function renderPage(pageNum) {
+  if (!pdfDoc.value || !canvasRef.value) return;
   
-  const halfWidth = signatureWidth / 2;
-  const halfHeight = signatureHeight / 2;
+  try {
+    // PDF.js usa páginas 1-based (1, 2, 3...)
+    const page = await pdfDoc.value.getPage(pageNum);
+    const viewport = page.getViewport({ scale: scale.value });
+    const canvas = canvasRef.value;
+    const context = canvas.getContext('2d');
+
+    if (!context) return;
+
+    canvas.height = viewport.height;
+    canvas.width = viewport.width;
+
+    const renderContext = {
+      canvasContext: context,
+      viewport: viewport,
+    };
+
+    await page.render(renderContext).promise;
+    
+    currentPage.value = pageNum;
+    position.value.page = pageNum; // Mantener 1-based para el frontend
+    
+    // Clear signature position when page changes
+    signaturePosition.value = null;
+    
+    console.log(`Página ${pageNum} renderizada (PDF.js 1-based)`);
+  } catch (error) {
+    console.error('Error al renderizar página:', error);
+  }
+}
+
+// Funciones para navegación de páginas
+function nextPage() {
+  if (pdfDoc.value && currentPage.value < pdfDoc.value.numPages) {
+    renderPage(currentPage.value + 1);
+  }
+}
+
+function prevPage() {
+  if (currentPage.value > 1) {
+    renderPage(currentPage.value - 1);
+  }
+}
+
+// Función para cargar documento seleccionado
+async function loadSelectedDocument() {
+  if (!selectedDocument.value) {
+    cleanupPDFResources();
+    return;
+  }
+
+  try {
+    loading.value = true;
+    
+    // Clean up previous resources
+    cleanupPDFResources();
+    
+    const res = await axios.get(`/api/documents/${selectedDocument.value.id}/view`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      responseType: 'blob'
+    });
+    
+    const blobUrl = URL.createObjectURL(res.data);
+    pdfBlobUrl.value = blobUrl;
+    
+    // Load PDF with PDF.js
+    await loadPDF(blobUrl);
+  } catch (e) {
+    console.error('Error viewing document:', e);
+    alert('No se pudo mostrar el documento.');
+  } finally {
+    loading.value = false;
+  }
+}
+
+// Funciones para manejo de arrastre de firma
+function handleCanvasClick(event) {
+  if (!canvasRef.value) return;
   
-  const x1 = centerX - halfWidth; // esquina inferior izquierda X
-  const y1 = centerY - halfHeight; // esquina inferior izquierda Y
-  const x2 = centerX + halfWidth; // esquina superior derecha X
-  const y2 = centerY + halfHeight; // esquina superior derecha Y
+  const canvas = canvasRef.value;
+  const rect = canvas.getBoundingClientRect();
+  const x = event.clientX - rect.left;
+  const y = event.clientY - rect.top;
   
-  return { x1, y1, x2, y2 };
-};
+  // Convertir coordenadas del canvas al sistema PDF estándar
+  const pdfCoords = convertCanvasToPDFCoordinates(
+    x, y, 
+    canvas.width, canvas.height, 
+    canvas.width / scale.value, canvas.height / scale.value
+  );
+  
+  // Calcular la caja de firma para PyHanko
+  const signatureBox = calculateSignatureBox(pdfCoords.x, pdfCoords.y);
+  
+  // Update position values con las coordenadas convertidas
+  position.value.posX = signatureBox.x1;
+  position.value.posY = signatureBox.y1;
+  
+  // Update signature position for visual feedback
+  signaturePosition.value = {
+    x: x,
+    y: y,
+    page: currentPage.value
+  };
+  
+  console.log('Coordenadas convertidas:', {
+    canvas: { x, y },
+    pdf: pdfCoords,
+    signatureBox: signatureBox
+  });
+}
+
+function handleSignatureMouseDown(event) {
+  if (!signaturePosition.value) return;
+  
+  isDragging.value = true;
+  const rect = event.target.getBoundingClientRect();
+  dragOffset.value = {
+    x: event.clientX - rect.left,
+    y: event.clientY - rect.top
+  };
+  
+  event.preventDefault();
+}
+
+function handleSignatureMouseMove(event) {
+  if (!isDragging.value || !canvasRef.value || !signaturePosition.value) return;
+  
+  const canvas = canvasRef.value;
+  const rect = canvas.getBoundingClientRect();
+  const x = event.clientX - rect.left - dragOffset.value.x;
+  const y = event.clientY - rect.top - dragOffset.value.y;
+  
+  // Mantener la firma dentro de los límites del canvas
+  const maxX = rect.width - 120; // 120px es el ancho de la firma
+  const maxY = rect.height - 60; // 60px es el alto de la firma
+  
+  const clampedX = Math.max(0, Math.min(x, maxX));
+  const clampedY = Math.max(0, Math.min(y, maxY));
+  
+  // Update signature position (coordenadas del canvas para la UI)
+  signaturePosition.value.x = clampedX;
+  signaturePosition.value.y = clampedY;
+  
+  // Convertir coordenadas del canvas al sistema PDF estándar
+  const pdfCoords = convertCanvasToPDFCoordinates(
+    clampedX, clampedY, 
+    canvas.width, canvas.height, 
+    canvas.width / scale.value, canvas.height / scale.value
+  );
+  
+  // Calcular la caja de firma para PyHanko
+  const signatureBox = calculateSignatureBox(pdfCoords.x, pdfCoords.y);
+  
+  // Update position values con las coordenadas de la caja de firma
+  position.value.posX = signatureBox.x1;
+  position.value.posY = signatureBox.y1;
+}
+
+function handleSignatureMouseUp() {
+  isDragging.value = false;
+}
+
+function clearSignaturePosition() {
+  signaturePosition.value = null;
+  position.value.posX = 0;
+  position.value.posY = 0;
+}
 
 onMounted(async () => {
   await fetchDocuments();
   await fetchUsers();
   setupWebSocket();
+  
+  // Event listeners para arrastre global
+  document.addEventListener('mousemove', handleSignatureMouseMove);
+  document.addEventListener('mouseup', handleSignatureMouseUp);
 });
 
 onUnmounted(() => {
   webSocketService.removeListener('signature_request_update');
+  document.removeEventListener('mousemove', handleSignatureMouseMove);
+  document.removeEventListener('mouseup', handleSignatureMouseUp);
+  cleanupPDFResources();
 });
 
 function setupWebSocket() {
@@ -166,6 +385,7 @@ async function submitRequest() {
     
     selectedUsers.value = [];
     selectedDocument.value = null;
+    cleanupPDFResources();
   } catch {
     status.value = 'Error al enviar la solicitud.';
     addNotification('Error', 'No se pudo enviar la solicitud de firma', 'error');
@@ -174,52 +394,195 @@ async function submitRequest() {
 </script>
 
 <template>
-  <div class="bg-white/90 rounded-xl shadow p-8 max-w-2xl mx-auto">
-    <h2 class="text-xl font-bold mb-4">Solicitar Firma Grupal</h2>
-    <div class="mb-4">
-      <label class="block font-medium mb-1">Selecciona un documento</label>
-      <select v-model="selectedDocument" class="w-full border rounded p-2">
-        <option :value="null">-- Selecciona --</option>
-        <option v-for="doc in documents" :key="doc.id" :value="doc">{{ doc.fileName }}</option>
-      </select>
-    </div>
-    <div class="mb-4">
-      <label class="block font-medium mb-1">Buscar usuario</label>
-      <input v-model="searchQuery" @input="searchUsers" placeholder="Nombre, apellido o email" class="w-full border rounded p-2 mb-2" />
-      <div v-if="userResults.length" class="bg-slate-50 border rounded p-2 max-h-32 overflow-y-auto">
-        <div v-for="user in userResults" :key="user.id" class="flex justify-between items-center py-1">
-          <span>{{ user.firstName }} {{ user.lastName }} ({{ user.email }})</span>
-          <button @click="addUser(user)" class="text-emerald-600 hover:underline">Agregar</button>
-        </div>
+  <div class="space-y-8">
+    <div class="flex items-center justify-between">
+      <div>
+        <h2 class="text-3xl font-bold text-slate-900">Solicitar Firma Grupal</h2>
+        <p class="text-slate-600 mt-2">Envía solicitudes de firma a múltiples usuarios</p>
       </div>
     </div>
-    <div class="mb-4">
-      <label class="block font-medium mb-1">Posición de la firma (para el usuario a agregar)</label>
-      <div class="flex space-x-2">
-        <input v-model.number="position.page" type="number" min="1" placeholder="Página" class="w-20 border rounded p-2" />
-        <input v-model.number="position.posX" type="number" min="0" placeholder="X" class="w-20 border rounded p-2" />
-        <input v-model.number="position.posY" type="number" min="0" placeholder="Y" class="w-20 border rounded p-2" />
-      </div>
-    </div>
-    <div class="mb-4">
-      <h4 class="font-medium mb-2">Usuarios seleccionados</h4>
-      <div v-if="selectedUsers.length === 0" class="text-slate-500">No hay usuarios agregados.</div>
-      <ul>
-        <li v-for="u in selectedUsers" :key="u.user.id" class="flex items-center justify-between py-1">
-          <div>
-            <span>{{ u.user.firstName }} {{ u.user.lastName }} ({{ u.user.email }})</span>
-            <div class="text-sm text-slate-600">
-              Página: {{ u.page }} | 
-              Posición original: ({{ u.originalPosX }}, {{ u.originalPosY }}) | 
-              Posición PyHanko: ({{ u.posX }}, {{ u.posY }})
-            </div>
-          </div>
-          <button @click="removeUser(u.user.id)" class="text-red-500 hover:underline">Quitar</button>
-        </li>
-      </ul>
-    </div>
-    <button @click="submitRequest" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg py-3">Solicitar Firma</button>
-    <p v-if="status" class="mt-2 text-center" :class="status.includes('correctamente') ? 'text-green-600' : 'text-red-600'">{{ status }}</p>
+
+         <div class="space-y-6">
+       <!-- Panel principal: Formulario y visualizador -->
+       <div class="border-0 shadow-sm bg-white/80 backdrop-blur-sm rounded-xl">
+         <div class="p-6">
+           <h3 class="text-xl font-semibold mb-4">Configuración de Solicitud</h3>
+           
+           <!-- Selección de documento -->
+           <div class="mb-6">
+             <label class="block font-medium mb-2">Selecciona un documento</label>
+             <select 
+               v-model="selectedDocument" 
+               @change="loadSelectedDocument"
+               class="w-full border border-emerald-200 focus:border-emerald-400 focus:ring-emerald-400 rounded px-3 py-2"
+             >
+               <option :value="null">-- Selecciona un documento --</option>
+               <option v-for="doc in documents" :key="doc.id" :value="doc">{{ doc.fileName }}</option>
+             </select>
+           </div>
+
+           <!-- Búsqueda de usuarios -->
+           <div class="mb-6">
+             <label class="block font-medium mb-2">Buscar usuario</label>
+             <input 
+               v-model="searchQuery" 
+               @input="searchUsers" 
+               placeholder="Nombre, apellido o email" 
+               class="w-full border border-emerald-200 focus:border-emerald-400 focus:ring-emerald-400 rounded px-3 py-2 mb-2" 
+             />
+             <div v-if="userResults.length" class="bg-slate-50 border rounded p-2 max-h-32 overflow-y-auto">
+               <div v-for="user in userResults" :key="user.id" class="flex justify-between items-center py-1">
+                 <span>{{ user.firstName }} {{ user.lastName }} ({{ user.email }})</span>
+                 <button @click="addUser(user)" class="text-emerald-600 hover:underline">Agregar</button>
+               </div>
+             </div>
+           </div>
+
+           <!-- Posición de firma (ahora visual) -->
+           <div class="mb-6">
+             <label class="block font-medium mb-2">Posición de la firma</label>
+             <div class="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+               <p class="text-sm text-blue-800 mb-2">
+                 <strong>💡 Instrucciones:</strong> Haz clic en el documento para colocar la firma, luego arrastra la imagen para ajustar la posición.
+               </p>
+               <div class="flex space-x-2">
+                 <button 
+                   @click="clearSignaturePosition" 
+                   class="px-3 py-1 bg-slate-500 text-white rounded hover:bg-slate-600 text-sm"
+                 >
+                   Limpiar Posición
+                 </button>
+               </div>
+             </div>
+           </div>
+
+           <!-- Visualizador de PDF debajo de las instrucciones -->
+           <div class="mb-6">
+             <div v-if="!selectedDocument" class="flex flex-col items-center justify-center py-20 border-2 border-dashed border-slate-300 rounded-lg">
+               <div class="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mb-6">
+                 <svg class="w-12 h-12 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                 </svg>
+               </div>
+               <h4 class="text-lg font-semibold text-slate-900 mb-2">Selecciona un documento</h4>
+               <p class="text-slate-600 text-center">Elige un documento para previsualizarlo y seleccionar la posición de la firma.</p>
+             </div>
+
+             <!-- Visualizador de PDF -->
+             <div v-if="pdfBlobUrl" class="border rounded overflow-hidden">
+               <!-- PDF Viewer Container -->
+               <div class="flex justify-center">
+                 <div class="relative" style="cursor: crosshair;">
+                   <!-- Loading indicator -->
+                   <div v-if="loading" class="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75 z-10">
+                     <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
+                   </div>
+                   
+                   <!-- PDF Canvas -->
+                   <canvas 
+                     ref="canvasRef" 
+                     @click="handleCanvasClick"
+                     class="border border-slate-200 shadow-sm"
+                   ></canvas>
+                   
+                   <!-- Información de páginas -->
+                   <div v-if="pdfDoc" class="mt-2 text-center text-sm text-slate-600">
+                     Página {{ currentPage }} de {{ pdfDoc.numPages }}
+                   </div>
+                   
+                   <!-- Controles de navegación -->
+                   <div v-if="pdfDoc && pdfDoc.numPages > 1" class="mt-4 flex justify-center items-center space-x-4">
+                     <button 
+                       @click="prevPage" 
+                       :disabled="currentPage <= 1"
+                       class="px-4 py-2 bg-slate-600 text-white rounded hover:bg-slate-700 disabled:bg-slate-400 disabled:cursor-not-allowed flex items-center"
+                     >
+                       <svg class="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                       </svg>
+                       Anterior
+                     </button>
+                     
+                     <!-- Selector de página -->
+                     <div class="flex items-center space-x-2">
+                       <span class="text-sm text-slate-600">Ir a:</span>
+                       <select 
+                         :value="currentPage" 
+                         @change="(e) => renderPage(Number(e.target.value))"
+                         class="px-3 py-1 border border-slate-300 rounded text-sm"
+                       >
+                         <option v-for="page in pdfDoc.numPages" :key="page" :value="page">
+                           Página {{ page }}
+                         </option>
+                       </select>
+                     </div>
+                     
+                     <button 
+                       @click="nextPage" 
+                       :disabled="currentPage >= pdfDoc.numPages"
+                       class="px-4 py-2 bg-slate-600 text-white rounded hover:bg-slate-700 disabled:bg-slate-400 disabled:cursor-not-allowed flex items-center"
+                     >
+                       Siguiente
+                       <svg class="w-4 h-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                       </svg>
+                     </button>
+                   </div>
+                   
+                   <!-- Signature Preview - Arrastrable -->
+                   <img 
+                     v-if="signaturePosition" 
+                     :src="firmaImg" 
+                     :style="{ 
+                       position: 'absolute', 
+                       left: (signaturePosition.x - 60) + 'px', 
+                       top: (signaturePosition.y - 30) + 'px', 
+                       width: '120px', 
+                       height: '60px', 
+                       zIndex: 10,
+                       cursor: isDragging ? 'grabbing' : 'grab',
+                       userSelect: 'none',
+                       pointerEvents: 'auto'
+                     }" 
+                     @mousedown="handleSignatureMouseDown"
+                     alt="Firma" 
+                     draggable="false"
+                   />
+                 </div>
+               </div>
+             </div>
+           </div>
+
+           <!-- Usuarios seleccionados -->
+           <div class="mb-6">
+             <h4 class="font-medium mb-2">Usuarios seleccionados</h4>
+             <div v-if="selectedUsers.length === 0" class="text-slate-500 text-sm">No hay usuarios agregados.</div>
+             <div v-else class="space-y-2">
+               <div v-for="u in selectedUsers" :key="u.user.id" class="flex items-center justify-between p-2 bg-slate-50 rounded">
+                 <div>
+                   <span class="font-medium">{{ u.user.firstName }} {{ u.user.lastName }}</span>
+                   <div class="text-xs text-slate-600">{{ u.user.email }}</div>
+                   <div class="text-xs text-slate-500">
+                     Página: {{ u.page }} | Posición: ({{ u.originalPosX }}, {{ u.originalPosY }})
+                   </div>
+                 </div>
+                 <button @click="removeUser(u.user.id)" class="text-red-500 hover:underline text-sm">Quitar</button>
+               </div>
+             </div>
+           </div>
+
+           <!-- Botón de envío -->
+           <button 
+             @click="submitRequest" 
+             class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg py-3"
+           >
+             Solicitar Firma
+           </button>
+           
+           <p v-if="status" class="mt-2 text-center" :class="status.includes('correctamente') ? 'text-green-600' : 'text-red-600'">{{ status }}</p>
+         </div>
+       </div>
+     </div>
     
     <!-- Sistema de notificaciones -->
     <div class="fixed top-4 right-4 z-50 space-y-2">

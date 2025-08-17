@@ -10,7 +10,7 @@ import NotificationToast from '../components/NotificationToast.vue';
 import NotificationList from '../components/NotificationList.vue';
 import RequestGroupSignature from '../components/RequestGroupSignature.vue';
 import PendingSignatureRequests from '../components/PendingSignatureRequests.vue';
-
+import MobileNavigation from '../components/MobileNavigation.vue';
 
 import { authState, authService } from '../service/Auth';
 import { getDocumentsByUser } from '../utils/api';
@@ -72,6 +72,8 @@ function renderIcon(icon, classes = '') {
       return `<svg class="${classes}" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>`;
     case 'shield':
       return `<svg class="${classes}" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>`;
+    case 'zap':
+      return `<svg class="${classes}" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>`;
     default:
       return '';
   }
@@ -82,6 +84,7 @@ const getUserInitials = () => {
   const { firstName, lastName } = authState.user;
   return `${(firstName?.[0] || '').toUpperCase()}${(lastName?.[0] || '').toUpperCase()}`;
 };
+
 const getUserFullName = () => {
   if (!authState.user) return '';
   const { firstName, lastName } = authState.user;
@@ -101,46 +104,39 @@ function handleSignOut() {
   window.location.hash = "/";
 }
 
-// Función para obtener documentos del usuario
-async function fetchDocuments() {
-  try {
-    const res = await getDocumentsByUser();
-    documents.value = res.data;
-  } catch (error) {
-    console.error('Error fetching documents:', error);
-  }
+// —– Section Change —–
+function handleSectionChange(section) {
+  activeSection.value = section;
 }
 
-// Documentos pendientes de firma
-const pendingDocuments = computed(() => {
-  return documents.value.filter(doc => !doc.signed && doc.status !== 'Firmado');
+// —– Load Documents —–
+onMounted(async () => {
+  try {
+    const response = await getDocumentsByUser();
+    if (response.status === 200) {
+      documents.value = response.data;
+    }
+  } catch (error) {
+    console.error('Error loading documents:', error);
+  }
 });
-
-// Documentos firmados
-const signedDocuments = computed(() => {
-  return documents.value.filter(doc => doc.signed || doc.status === 'Firmado');
-});
-
-onMounted(() => {
-  fetchDocuments();
-  window.addEventListener('go-to-request-signature', () => {
-    activeSection.value = 'request';
-  });
-});
-
-
-
-
 </script>
 
 <template>
   <div class="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50">
+    <!-- Mobile Navigation -->
+    <MobileNavigation 
+      :active-section="activeSection" 
+      @section-change="handleSectionChange"
+      @sign-out="handleSignOut"
+    />
+
     <!-- Top Navigation -->
-    <nav class="bg-white/90 backdrop-blur-md border-b border-emerald-100 sticky top-0 z-50">
+    <nav class="bg-white/90 backdrop-blur-md border-b border-emerald-100 sticky top-0 z-50 lg:block hidden">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between items-center h-16">
           <!-- Logo y nombre -->
-          <div class="flex items-center space-x-3">
+          <div class="flex items-center space-x-4">
             <img src="../assets/E.png" alt="E-Signature Logo" class="w-10 h-10 rounded-xl shadow-lg" style="object-fit: contain;" />
             <div>
               <h1 class="text-xl font-bold text-slate-900">E-Signature</h1>
@@ -171,6 +167,7 @@ onMounted(() => {
         </div>
       </div>
     </nav>
+
     <!-- Side Navigation -->
     <div class="flex">
       <aside class="w-64 bg-white/60 backdrop-blur-sm border-r border-emerald-100 min-h-screen p-6 hidden lg:block">
@@ -219,60 +216,68 @@ onMounted(() => {
           <button class="w-full mt-3 text-white hover:bg-white/20 rounded py-2" @click="handleSignOut">Cerrar Sesión</button>
         </div>
       </aside>
-      <!-- Main Content -->
-      <main class="flex-1 p-6 lg:p-8">
+
+      <!-- Main Content - Responsive para todos los dispositivos -->
+      <main class="flex-1 p-4 lg:p-6 xl:p-8 pt-20 lg:pt-6">
         <div class="max-w-6xl mx-auto">
-          <template v-if="activeSection === 'dashboard'">
+          <!-- Render Section Based on Active Section -->
+          <UploadSection v-if="activeSection === 'upload'" />
+          <SignDocuments v-else-if="activeSection === 'sign'" />
+          <MyDocuments v-else-if="activeSection === 'documents'" />
+          <RequestSignature v-else-if="activeSection === 'request-signature'" />
+          <CertificateRequestForm v-else-if="activeSection === 'certificate-request'" />
+          <AdminCertificateRequests v-else-if="activeSection === 'admin-requests'" />
+          <RequestGroupSignature v-else-if="activeSection === 'group-signature'" />
+          <PendingSignatureRequests v-else-if="activeSection === 'pending-signature'" />
+          
+          <!-- Dashboard Content - Se adapta automáticamente -->
+          <template v-else>
             <!-- Acciones Rápidas -->
-            <div class="space-y-8">
+            <div class="space-y-6 lg:space-y-8">
               <div class="border-0 shadow-sm bg-white/80 backdrop-blur-sm rounded-xl">
-                <div class="p-6">
-                  <h2 class="text-xl text-slate-900 font-bold mb-1">Acciones Rápidas</h2>
-                  <p class="text-slate-600 mb-4">Accede rápidamente a las funciones principales</p>
-                  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                    <button v-for="(action, index) in quickActions" :key="index" @click="action.action" class="h-24 flex flex-col items-center justify-center space-y-2 border border-emerald-200 hover:bg-emerald-50 hover:border-emerald-300 transition-all duration-200 bg-transparent rounded-xl">
-                      <span v-html="renderIcon(action.icon, 'w-6 h-6 text-emerald-600')"></span>
-                      <span class="text-sm font-medium text-slate-700">{{ action.label }}</span>
+                <div class="p-4 lg:p-6">
+                  <h2 class="text-lg lg:text-xl text-slate-900 font-bold mb-1">Acciones Rápidas</h2>
+                  <p class="text-slate-600 mb-4 text-sm lg:text-base">Accede rápidamente a las funciones principales</p>
+                  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
+                    <button v-for="(action, index) in quickActions" :key="index" @click="action.action" class="h-20 lg:h-24 flex flex-col items-center justify-center space-y-2 border border-emerald-200 hover:bg-emerald-50 hover:border-emerald-300 transition-all duration-200 bg-transparent rounded-xl">
+                      <span v-html="renderIcon(action.icon, 'w-5 h-5 lg:w-6 lg:h-6 text-emerald-600')"></span>
+                      <span class="text-xs lg:text-sm font-medium text-slate-700 text-center px-1">{{ action.label }}</span>
                     </button>
                   </div>
                 </div>
               </div>
+              
               <!-- Documentos Pendientes -->
               <div class="border-0 shadow-sm bg-white/80 backdrop-blur-sm rounded-xl">
-                <div class="p-6 border-b border-emerald-100">
-                  <h3 class="text-xl font-semibold text-slate-900 mb-2">Documentos Pendientes de Firma</h3>
+                <div class="p-4 lg:p-6 border-b border-emerald-100">
+                  <h3 class="text-lg lg:text-xl font-semibold text-slate-900 mb-2">Documentos Pendientes de Firma</h3>
                   <p class="text-slate-600 text-sm">Documentos que requieren tu firma digital</p>
                 </div>
-                <div class="p-6">
-                  <div v-if="pendingDocuments.length === 0" class="text-center py-12">
-                    <div class="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <span v-html="renderIcon('file', 'w-10 h-10 text-emerald-600')"></span>
+                <div class="p-4 lg:p-6">
+                  <div v-if="documents.filter(doc => !doc.signed && doc.status !== 'Firmado').length === 0" class="text-center py-8 lg:py-12">
+                    <div class="w-16 h-16 lg:w-20 lg:h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-3 lg:mb-4">
+                      <span v-html="renderIcon('file', 'w-8 h-8 lg:w-10 lg:h-10 text-emerald-600')"></span>
                     </div>
-                    <p class="text-lg text-slate-700 mb-4 font-medium">No tienes documentos pendientes</p>
-                    <button class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-lg font-medium shadow-lg" @click="activeSection = 'upload'">Subir Documento</button>
+                    <p class="text-base lg:text-lg text-slate-700 mb-3 lg:mb-4 font-medium">No tienes documentos pendientes</p>
+                    <button class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 lg:px-6 py-2 lg:py-3 rounded-lg text-sm lg:text-base font-medium shadow-lg" @click="activeSection = 'upload'">Subir Documento</button>
                   </div>
-                  <div v-else class="space-y-4">
-                    <div v-for="doc in pendingDocuments.slice(0, 5)" :key="doc.id" class="flex items-center justify-between p-4 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors border border-emerald-100">
-                      <div class="flex items-center space-x-4">
-                        <div class="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center">
-                          <span v-html="renderIcon('file', 'w-6 h-6 text-emerald-600')"></span>
+                  <div v-else class="space-y-3 lg:space-y-4">
+                    <div v-for="doc in documents.filter(doc => !doc.signed && doc.status !== 'Firmado').slice(0, 5)" :key="doc.id" class="flex items-center justify-between p-3 lg:p-4 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors border border-emerald-100">
+                      <div class="flex items-center space-x-3 lg:space-x-4">
+                        <div class="w-10 h-10 lg:w-12 lg:h-12 bg-emerald-100 rounded-lg flex items-center justify-center">
+                          <span v-html="renderIcon('file', 'w-5 h-5 lg:w-6 lg:h-6 text-emerald-600')"></span>
                         </div>
                         <div>
-                          <p class="font-medium text-slate-900">{{ doc.fileName }}</p>
-                          <p class="text-sm text-slate-600">{{ new Date(doc.uploadedAt).toLocaleDateString() }} • {{ (doc.size / 1024 / 1024).toFixed(2) }} MB</p>
+                          <p class="font-medium text-slate-900 text-sm lg:text-base">{{ doc.fileName || doc.name || 'Documento sin nombre' }}</p>
+                          <p class="text-xs lg:text-sm text-slate-600">{{ doc.uploadDate ? new Date(doc.uploadDate).toLocaleDateString() : 'Fecha no disponible' }}</p>
                         </div>
                       </div>
-                      <div class="flex items-center space-x-3">
-                        <span class="bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-xs font-semibold">Pendiente</span>
-                        <button @click="activeSection = 'sign'" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                      <div class="flex items-center space-x-2 lg:space-x-3">
+                        <span class="bg-amber-100 text-amber-700 px-2 lg:px-3 py-1 rounded-full text-xs font-semibold">Pendiente</span>
+                        <button @click="activeSection = 'sign'" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 lg:px-4 py-1 lg:py-2 rounded-lg text-xs lg:text-sm font-medium transition-colors">
                           Firmar Ahora
                         </button>
                       </div>
-                    </div>
-                    <div v-if="pendingDocuments.length > 5" class="text-center pt-4">
-                      <button @click="activeSection = 'documents'" class="text-emerald-600 hover:text-emerald-700 font-medium">
-                        Ver todos los documentos ({{ pendingDocuments.length }})
-                      </button>
                     </div>
                   </div>
                 </div>
@@ -280,83 +285,47 @@ onMounted(() => {
               
               <!-- Documentos Recientemente Firmados -->
               <div class="border-0 shadow-sm bg-white/80 backdrop-blur-sm rounded-xl">
-                <div class="p-6 border-b border-emerald-100">
-                  <h3 class="text-xl font-semibold text-slate-900 mb-2">Documentos Recientemente Firmados</h3>
+                <div class="p-4 lg:p-6 border-b border-emerald-100">
+                  <h3 class="text-lg lg:text-xl font-semibold text-slate-900 mb-2">Documentos Recientemente Firmados</h3>
                   <p class="text-slate-600 text-sm">Tus documentos firmados más recientes</p>
                 </div>
-                <div class="p-6">
-                  <div v-if="signedDocuments.length === 0" class="text-center py-12">
-                    <div class="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <span v-html="renderIcon('file', 'w-10 h-10 text-emerald-600')"></span>
+                <div class="p-4 lg:p-6">
+                  <div v-if="documents.filter(doc => doc.signed || doc.status === 'Firmado').length === 0" class="text-center py-8 lg:py-12">
+                    <div class="w-16 h-16 lg:w-20 lg:h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-3 lg:mb-4">
+                      <span v-html="renderIcon('file', 'w-8 h-8 lg:w-10 lg:h-10 text-emerald-600')"></span>
                     </div>
-                    <p class="text-lg text-slate-700 mb-4 font-medium">No hay documentos firmados</p>
-                    <p class="text-slate-500 text-sm">Los documentos que firmes aparecerán aquí</p>
+                    <p class="text-base lg:text-lg text-slate-700 mb-3 lg:mb-4 font-medium">No hay documentos firmados</p>
+                    <p class="text-slate-500 text-sm lg:text-base">Los documentos que firmes aparecerán aquí</p>
                   </div>
-                  <div v-else class="space-y-4">
-                    <div v-for="doc in signedDocuments.slice(0, 3)" :key="doc.id" class="flex items-center justify-between p-4 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors border border-emerald-100">
-                      <div class="flex items-center space-x-4">
-                        <div class="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center">
-                          <span v-html="renderIcon('file', 'w-6 h-6 text-emerald-600')"></span>
+                  <div v-else class="space-y-3 lg:space-y-4">
+                    <div v-for="doc in documents.filter(doc => doc.signed || doc.status === 'Firmado').slice(0, 3)" :key="doc.id" class="flex items-center justify-between p-3 lg:p-4 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors border border-emerald-100">
+                      <div class="flex items-center space-x-3 lg:space-x-4">
+                        <div class="w-10 h-10 lg:w-12 lg:h-12 bg-emerald-100 rounded-lg flex items-center justify-center">
+                          <span v-html="renderIcon('file', 'w-5 h-5 lg:w-6 lg:h-6 text-emerald-600')"></span>
                         </div>
                         <div>
-                          <p class="font-medium text-slate-900">{{ doc.fileName }}</p>
-                          <p class="text-sm text-slate-600">{{ new Date(doc.uploadedAt).toLocaleDateString() }} • {{ (doc.size / 1024 / 1024).toFixed(2) }} MB</p>
+                          <p class="font-medium text-slate-900 text-sm lg:text-base">{{ doc.fileName || doc.name || 'Documento sin nombre' }}</p>
+                          <p class="text-xs lg:text-sm text-slate-600">{{ doc.uploadDate ? new Date(doc.uploadDate).toLocaleDateString() : 'Fecha no disponible' }}</p>
                         </div>
                       </div>
-                      <div class="flex items-center space-x-3">
-                        <span class="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-xs font-semibold">Firmado</span>
-                        <button @click="activeSection = 'documents'" class="text-emerald-600 hover:text-emerald-700 font-medium text-sm">
+                      <div class="flex items-center space-x-2 lg:space-x-3">
+                        <span class="bg-emerald-100 text-emerald-700 px-2 lg:px-3 py-1 rounded-full text-xs font-semibold">Firmado</span>
+                        <button @click="activeSection = 'documents'" class="text-emerald-600 hover:text-emerald-700 font-medium text-xs lg:text-sm">
                           Ver Detalles
                         </button>
                       </div>
-                    </div>
-                    <div v-if="signedDocuments.length > 3" class="text-center pt-4">
-                      <button @click="activeSection = 'documents'" class="text-emerald-600 hover:text-emerald-700 font-medium">
-                        Ver todos los documentos firmados ({{ signedDocuments.length }})
-                      </button>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
           </template>
-          <UploadSection v-else-if="activeSection === 'upload'" />
-          <SignDocuments v-else-if="activeSection === 'sign'" />
-          <MyDocuments v-else-if="activeSection === 'documents'" />
-          <CertificateRequestForm v-else-if="activeSection === 'certificate-request'" />
-          <AdminCertificateRequests v-else-if="activeSection === 'admin-requests'" />
-          <RequestGroupSignature v-else-if="activeSection === 'group-signature'" />
-          <PendingSignatureRequests v-else-if="activeSection === 'pending-signature'" />
         </div>
       </main>
     </div>
-    <!-- Mobile Navigation -->
-    <div class="lg:hidden fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-emerald-100 p-4">
-      <div class="flex justify-around">
-        <button :class="['flex-col space-y-1 items-center', activeSection === 'dashboard' ? 'text-emerald-600' : 'text-slate-600']" @click="activeSection = 'dashboard'">
-          <div class="w-6 h-6 rounded bg-emerald-100 flex items-center justify-center"><div class="w-2 h-2 bg-emerald-600 rounded"></div></div>
-          <span class="text-xs">Inicio</span>
-        </button>
-        <button :class="['flex-col space-y-1 items-center', activeSection === 'sign' ? 'text-emerald-600' : 'text-slate-600']" @click="activeSection = 'sign'">
-          <span v-html="renderIcon('pen', 'w-6 h-6')"></span>
-          <span class="text-xs">Firmar</span>
-        </button>
-        <button :class="['flex-col space-y-1 items-center', activeSection === 'upload' ? 'text-emerald-600' : 'text-slate-600']" @click="activeSection = 'upload'">
-          <span v-html="renderIcon('upload', 'w-6 h-6')"></span>
-          <span class="text-xs">Subir</span>
-        </button>
-        <button :class="['flex-col space-y-1 items-center', activeSection === 'documents' ? 'text-emerald-600' : 'text-slate-600']" @click="activeSection = 'documents'">
-          <span v-html="renderIcon('file', 'w-6 h-6')"></span>
-          <span class="text-xs">Docs</span>
-        </button>
-        <button v-if="!isAdmin" :class="['flex-col space-y-1 items-center', activeSection === 'certificate-request' ? 'text-emerald-600' : 'text-slate-600']" @click="activeSection = 'certificate-request'">
-          <span v-html="renderIcon('shield', 'w-6 h-6')"></span>
-          <span class="text-xs">Cert</span>
-        </button>
-      </div>
-    </div>
-    
+
     <!-- Componente de notificaciones -->
     <NotificationToast />
+    <NotificationList />
   </div>
 </template>

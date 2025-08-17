@@ -60,6 +60,7 @@
             placeholder="Crea una contraseña segura para tu certificado"
             required
             class="w-full border border-emerald-200 rounded-md py-3 px-4 pr-10 focus:ring-emerald-400 focus:border-emerald-400"
+            @input="validatePasswordInput"
           />
           <button
             type="button"
@@ -75,6 +76,98 @@
             </svg>
           </button>
         </div>
+        
+        <!-- Indicador de Fortaleza de Contraseña -->
+        <div v-if="form.password" class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-sm font-medium text-gray-700">Fortaleza de la contraseña:</span>
+            <span :class="['text-sm font-semibold', passwordValidation.color]">{{ passwordValidation.strength }}</span>
+          </div>
+          
+          <!-- Barra de progreso -->
+          <div class="w-full bg-gray-200 rounded-full h-2 mb-3">
+            <div 
+              :class="['h-2 rounded-full transition-all duration-300', getStrengthColor(passwordValidation.score)]"
+              :style="{ width: passwordValidation.score + '%' }"
+            ></div>
+          </div>
+          
+          <!-- Puntuación -->
+          <div class="text-xs text-gray-500 mb-3">
+            Puntuación: {{ passwordValidation.score }}/100
+          </div>
+          
+          <!-- Requisitos -->
+          <div class="space-y-2">
+            <div class="flex items-center text-sm">
+              <span :class="['w-4 h-4 mr-2 rounded-full flex items-center justify-center', passwordValidation.requirements.minLength ? 'bg-green-500' : 'bg-red-500']">
+                <svg v-if="passwordValidation.requirements.minLength" class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                </svg>
+                <svg v-else class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                </svg>
+              </span>
+              Mínimo 8 caracteres
+            </div>
+            <div class="flex items-center text-sm">
+              <span :class="['w-4 h-4 mr-2 rounded-full flex items-center justify-center', passwordValidation.requirements.hasUppercase ? 'bg-green-500' : 'bg-red-500']">
+                <svg v-if="passwordValidation.requirements.hasUppercase" class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                </svg>
+                <svg v-else class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                </svg>
+              </span>
+              Al menos 1 letra mayúscula
+            </div>
+            <div class="flex items-center text-sm">
+              <span :class="['w-4 h-4 mr-2 rounded-full flex items-center justify-center', passwordValidation.requirements.hasLowercase ? 'bg-green-500' : 'bg-red-500']">
+                <svg v-if="passwordValidation.requirements.hasLowercase" class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                </svg>
+                <svg v-else class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                </svg>
+              </span>
+              Al menos 1 letra minúscula
+            </div>
+            <div class="flex items-center text-sm">
+              <span :class="['w-4 h-4 mr-2 rounded-full flex items-center justify-center', passwordValidation.requirements.hasNumber ? 'bg-green-500' : 'bg-red-500']">
+                <svg v-if="passwordValidation.requirements.hasNumber" class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                </svg>
+                <svg v-else class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                </svg>
+              </span>
+              Al menos 1 número
+            </div>
+            <div class="flex items-center text-sm">
+              <span :class="['w-4 h-4 mr-2 rounded-full flex items-center justify-center', passwordValidation.requirements.hasSpecialChar ? 'bg-green-500' : 'bg-red-500']">
+                <svg v-if="passwordValidation.requirements.hasSpecialChar" class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                </svg>
+                <svg v-else class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                </svg>
+              </span>
+              Al menos 1 símbolo especial (!@#$%^&*)
+            </div>
+          </div>
+          
+          <!-- Sugerencias -->
+          <div v-if="passwordValidation.feedback.length > 0" class="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded">
+            <p class="text-xs text-yellow-800 font-medium mb-1">Sugerencias para mejorar:</p>
+            <ul class="text-xs text-yellow-700 space-y-1">
+              <li v-for="suggestion in passwordValidation.feedback" :key="suggestion" class="flex items-center">
+                <span class="w-1 h-1 bg-yellow-500 rounded-full mr-2"></span>
+                {{ suggestion }}
+              </li>
+            </ul>
+          </div>
+        </div>
+        
         <p class="text-sm text-slate-500">Esta contraseña protegerá tu certificado digital</p>
       </div>
 
@@ -94,7 +187,7 @@
 
       <button
         type="submit"
-        :disabled="loading"
+        :disabled="loading || !passwordValidation.isValid"
         class="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white font-medium py-3 px-6 rounded-lg transition-colors flex items-center justify-center"
       >
         <svg v-if="loading" class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -121,9 +214,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, onMounted, computed } from 'vue';
 import { createCertificateRequest } from '../utils/api';
 import { authState } from '../service/Auth';
+import { validatePassword, getStrengthColor } from '../utils/password-validation';
 
 const loading = ref(false);
 const showPassword = ref(false);
@@ -137,6 +231,26 @@ const form = reactive({
   password: ''
 });
 
+// Validación de contraseña en tiempo real
+const passwordValidation = computed(() => {
+  return validatePassword(form.password);
+});
+
+// Función para validar la contraseña cuando se escribe
+const validatePasswordInput = () => {
+  // La validación se ejecuta automáticamente por el computed
+  // Solo necesitamos asegurarnos de que se actualice la UI
+};
+
+// Función para obtener el color de la barra de progreso
+const getStrengthColor = (score: number): string => {
+  if (score < 40) return 'bg-red-500';
+  if (score < 60) return 'bg-orange-500';
+  if (score < 80) return 'bg-yellow-500';
+  if (score < 90) return 'bg-blue-500';
+  return 'bg-green-500';
+};
+
 // Cargar el correo del usuario actual al montar el componente
 onMounted(() => {
   if (authState.user?.email) {
@@ -145,6 +259,13 @@ onMounted(() => {
 });
 
 const handleSubmit = async () => {
+  // Validar que la contraseña cumpla con los requisitos
+  if (!passwordValidation.value.isValid) {
+    message.value = 'La contraseña no cumple con los requisitos de seguridad. Por favor, mejórala antes de continuar.';
+    messageType.value = 'error';
+    return;
+  }
+
   loading.value = true;
   message.value = '';
   
