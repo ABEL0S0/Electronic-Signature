@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, shallowRef } from 'vue';
+import axios from 'axios';
 import { getDocumentsByUser, getAllUsers, createSignatureRequest } from '../utils/api';
 import { authState } from '../service/Auth';
 import { webSocketService } from '../service/WebSocketService';
@@ -42,6 +43,10 @@ const dragOffset = ref({ x: 0, y: 0 });
 
 // Asegurar que currentPage siempre sea válido
 const getCurrentPage = () => Math.max(1, currentPage.value);
+
+function getToken() {
+  return localStorage.getItem('token');
+}
 
 // Cleanup function
 function cleanupPDFResources() {
@@ -130,16 +135,12 @@ async function loadSelectedDocument() {
     // Clean up previous resources
     cleanupPDFResources();
     
-    const res = await fetch(`/api/documents/${selectedDocument.value.id}/view`, {
-      headers: { 
-        'Authorization': `Bearer ${localStorage.getItem('token')}` 
-      }
+    const res = await axios.get(`/api/documents/${selectedDocument.value.id}/view`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      responseType: 'blob'
     });
     
-    if (!res.ok) throw new Error('Error al cargar documento');
-    
-    const blob = await res.blob();
-    const blobUrl = URL.createObjectURL(blob);
+    const blobUrl = URL.createObjectURL(res.data);
     pdfBlobUrl.value = blobUrl;
     
     // Load PDF with PDF.js
@@ -193,7 +194,7 @@ function handleSignatureMouseDown(event) {
   if (!signaturePosition.value) return;
   
   isDragging.value = true;
-  const rect = (event.target).getBoundingClientRect();
+  const rect = event.target.getBoundingClientRect();
   dragOffset.value = {
     x: event.clientX - rect.left,
     y: event.clientY - rect.top
@@ -503,89 +504,89 @@ async function submitRequest() {
               <p class="text-slate-600 text-center">Elige un documento del panel izquierdo para previsualizarlo y seleccionar la posición de la firma.</p>
             </div>
 
-            <!-- Visualizador de PDF -->
-            <div v-if="pdfBlobUrl" class="border rounded overflow-hidden">
-              <!-- Loading indicator -->
-              <div v-if="loading" class="flex items-center justify-center py-20">
-                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
-              </div>
-              
-              <!-- PDF Viewer Container -->
-              <div v-else class="flex justify-center">
-                <div class="relative" style="cursor: crosshair;">
-                  <!-- PDF Canvas -->
-                  <canvas 
-                    ref="canvasRef" 
-                    @click="handleCanvasClick"
-                    class="border border-slate-200 shadow-sm"
-                  ></canvas>
-                  
-                  <!-- Información de páginas -->
-                  <div v-if="pdfDoc" class="mt-2 text-center text-sm text-slate-600">
-                    Página {{ currentPage }} de {{ pdfDoc.numPages }}
-                  </div>
-                  
-                  <!-- Controles de navegación -->
-                  <div v-if="pdfDoc && pdfDoc.numPages > 1" class="mt-4 flex justify-center items-center space-x-4">
-                    <button 
-                      @click="prevPage" 
-                      :disabled="currentPage <= 1"
-                      class="px-4 py-2 bg-slate-600 text-white rounded hover:bg-slate-700 disabled:bg-slate-400 disabled:cursor-not-allowed flex items-center"
-                    >
-                      <svg class="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-                      </svg>
-                      Anterior
-                    </button>
-                    
-                    <!-- Selector de página -->
-                    <div class="flex items-center space-x-2">
-                      <span class="text-sm text-slate-600">Ir a:</span>
-                      <select 
-                        :value="currentPage" 
-                        @change="(e) => renderPage(Number(e.target.value))"
-                        class="px-3 py-1 border border-slate-300 rounded text-sm"
-                      >
-                        <option v-for="page in pdfDoc.numPages" :key="page" :value="page">
-                          Página {{ page }}
-                        </option>
-                      </select>
-                    </div>
-                    
-                    <button 
-                      @click="nextPage" 
-                      :disabled="currentPage >= pdfDoc.numPages"
-                      class="px-4 py-2 bg-slate-600 text-white rounded hover:bg-slate-700 disabled:bg-slate-400 disabled:cursor-not-allowed flex items-center"
-                    >
-                      Siguiente
-                      <svg class="w-4 h-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                      </svg>
-                    </button>
-                  </div>
-                  
-                  <!-- Signature Preview - Arrastrable -->
-                  <img 
-                    v-if="signaturePosition" 
-                    :src="firmaImg" 
-                    :style="{ 
-                      position: 'absolute', 
-                      left: (signaturePosition.x - 60) + 'px', 
-                      top: (signaturePosition.y - 30) + 'px', 
-                      width: '120px', 
-                      height: '60px', 
-                      zIndex: 10,
-                      cursor: isDragging ? 'grabbing' : 'grab',
-                      userSelect: 'none',
-                      pointerEvents: 'auto'
-                    }" 
-                    @mousedown="handleSignatureMouseDown"
-                    alt="Firma" 
-                    draggable="false"
-                  />
-                </div>
-              </div>
-            </div>
+                         <!-- Visualizador de PDF -->
+             <div v-if="pdfBlobUrl" class="border rounded overflow-hidden p-4 mt-4">
+               <!-- PDF Viewer Container -->
+               <div class="flex justify-center">
+                 <div class="relative" style="cursor: crosshair;">
+                   <!-- Loading indicator -->
+                   <div v-if="loading" class="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75 z-10">
+                     <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
+                   </div>
+                   
+                   <!-- PDF Canvas -->
+                   <canvas 
+                     ref="canvasRef" 
+                     @click="handleCanvasClick"
+                     class="border border-slate-200 shadow-sm"
+                   ></canvas>
+                   
+                   <!-- Información de páginas -->
+                   <div v-if="pdfDoc" class="mt-2 text-center text-sm text-slate-600">
+                     Página {{ currentPage }} de {{ pdfDoc.numPages }}
+                   </div>
+                   
+                   <!-- Controles de navegación -->
+                   <div v-if="pdfDoc && pdfDoc.numPages > 1" class="mt-4 flex justify-center items-center space-x-4">
+                     <button 
+                       @click="prevPage" 
+                       :disabled="currentPage <= 1"
+                       class="px-4 py-2 bg-slate-600 text-white rounded hover:bg-slate-700 disabled:bg-slate-400 disabled:cursor-not-allowed flex items-center"
+                     >
+                       <svg class="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                       </svg>
+                       Anterior
+                     </button>
+                     
+                     <!-- Selector de página -->
+                     <div class="flex items-center space-x-2">
+                       <span class="text-sm text-slate-600">Ir a:</span>
+                       <select 
+                         :value="currentPage" 
+                         @change="(e) => renderPage(Number(e.target.value))"
+                         class="px-3 py-1 border border-slate-300 rounded text-sm"
+                       >
+                         <option v-for="page in pdfDoc.numPages" :key="page" :value="page">
+                           Página {{ page }}
+                         </option>
+                       </select>
+                     </div>
+                     
+                     <button 
+                       @click="nextPage" 
+                       :disabled="currentPage >= pdfDoc.numPages"
+                       class="px-4 py-2 bg-slate-600 text-white rounded hover:bg-slate-700 disabled:bg-slate-400 disabled:cursor-not-allowed flex items-center"
+                     >
+                       Siguiente
+                       <svg class="w-4 h-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                       </svg>
+                     </button>
+                   </div>
+                   
+                   <!-- Signature Preview - Arrastrable -->
+                   <img 
+                     v-if="signaturePosition" 
+                     :src="firmaImg" 
+                     :style="{ 
+                       position: 'absolute', 
+                       left: (signaturePosition.x - 60) + 'px', 
+                       top: (signaturePosition.y - 30) + 'px', 
+                       width: '120px', 
+                       height: '60px', 
+                       zIndex: 10,
+                       cursor: isDragging ? 'grabbing' : 'grab',
+                       userSelect: 'none',
+                       pointerEvents: 'auto'
+                     }" 
+                     @mousedown="handleSignatureMouseDown"
+                     alt="Firma" 
+                     draggable="false"
+                   />
+                 </div>
+               </div>
+             </div>
           </div>
         </div>
       </div>
