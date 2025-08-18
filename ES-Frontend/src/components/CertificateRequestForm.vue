@@ -217,7 +217,7 @@
 import { ref, reactive, onMounted, computed } from 'vue';
 import { createCertificateRequest } from '../utils/api';
 import { authState } from '../service/Auth';
-import { validatePassword, getStrengthColor } from '../utils/password-validation';
+import { validatePassword } from '../utils/password-validation';
 
 const loading = ref(false);
 const showPassword = ref(false);

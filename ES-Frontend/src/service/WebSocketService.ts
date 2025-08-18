@@ -1,4 +1,4 @@
-import webSocketManager from '../utils/websocket.js';
+import { webSocketManager } from '../utils/websocket';
 
 export interface NotificationMessage {
   title: string;
@@ -33,11 +33,11 @@ class WebSocketService {
     webSocketManager.disconnect();
   }
 
-  addListener(type: 'user' | 'admin' | 'auth_success' | 'signature_request' | 'signature_request_update', callback: (message: NotificationMessage | SignatureRequestMessage | SignatureRequestUpdateMessage | any) => void) {
+  addListener(type: 'user' | 'admin', callback: (message: NotificationMessage | SignatureRequestMessage | SignatureRequestUpdateMessage | any) => void) {
     webSocketManager.addListener(type, callback);
   }
 
-  removeListener(type: 'user' | 'admin' | 'auth_success' | 'signature_request' | 'signature_request_update') {
+  removeListener(type: 'user' | 'admin') {
     webSocketManager.removeListener(type);
   }
 
