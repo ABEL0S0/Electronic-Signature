@@ -139,6 +139,141 @@ Electronic-Signature/
 
 ---
 
+## Requisitos
+
+- Java 17+ (OpenJDK/Adoptium recomendado) para el backend
+- Maven (el proyecto incluye el wrapper `mvnw`/`mvnw.cmd`)
+- Node.js 16+ y npm/yarn/pnpm para el frontend
+- Python 3.8+ y PyHanko (solo si ejecutas el componente de firma localmente)
+- Docker & Docker Compose (opcional, para despliegue)
+
+## Instalación y ejecución (local)
+
+Sugerencia: abre dos terminales (uno para backend, otro para frontend).
+
+Backend (Windows / PowerShell):
+
+```powershell
+cd ES-Backend
+.\mvnw spring-boot:run
+```
+
+Esto arranca la API en el puerto configurado en `application.properties` (por defecto 8080).
+
+Frontend (dev server):
+
+```bash
+cd ES-Frontend
+npm install
+npm run dev
+```
+
+El frontend usa Vite y por defecto se sirve en `http://localhost:5173`.
+
+Si usas Yarn o pnpm, reemplaza los comandos por `yarn` / `pnpm install` y `yarn dev` / `pnpm dev`.
+
+## Ejecutar con Docker (stack completo)
+
+En la carpeta `despliegue/` hay un `docker-compose.yml` y Dockerfiles para backend/frontend. Asegúrate de crear un fichero `.env` basado en `env.example` antes de levantar los contenedores.
+
+```bash
+cd despliegue
+docker compose up --build
+```
+
+Esto levantará servicios: frontend, backend, MongoDB y nginx (según la configuración del compose).
+
+## Variables de entorno importantes
+
+- `SPRING_DATASOURCE_URL` / `SPRING_DATASOURCE_USERNAME` / `SPRING_DATASOURCE_PASSWORD` — conexión a la BD relacional
+- `SPRING_DATA_MONGODB_URI` — URI para MongoDB
+- `JWT_SECRET` — clave secreta para firmar JWT (no incluir en repositorio)
+- `PYHANKO_SCRIPT_PATH` — ruta al script/entorno que ejecuta PyHanko (si aplica)
+- `FILES_BASE_PATH` — directorio donde se guardan `files/uploads` (útil para despliegue)
+
+Revisa `ES-Backend/src/main/resources/application.properties` para valores por defecto.
+
+## API rápida (Resumen)
+
+Se incluyen algunos endpoints principales; para una documentación completa recomienda usar Swagger si lo integras.
+
+- Autenticación: `/api/auth/login`, `/api/auth/register`, `/api/auth/verify`.
+- Documentos: `/api/documents` (upload, list, view/download, sign).
+- Certificados: `/api/certificates` (subida/descarga/listado por usuario).
+- Solicitudes de firma: `/api/signature-requests` (crear, listar, responder).
+
+Ejemplo de creación de solicitud de firma (REST):
+
+```http
+POST /api/signature-requests
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "documentPath": "files/uploads/documents/64e1b2c1e4b0a2f8b7c8d9e0/document.pdf",
+  "users": [ { "userId": 123, "page": 1, "posX": 100, "posY": 200 } ]
+}
+```
+
+## WebSocket / Mensajes en tiempo real
+
+- Conecta a `/ws` (método de conexión según la configuración, suele usarse SockJS / STOMP en Spring Boot o socket/ws en implementaciones simples).
+- Mensajes entrantes y salientes (ejemplos):
+  - Tipo `SIGNATURE_REQUEST` — notifica a un usuario que tiene una solicitud pendiente.
+  - Tipo `SIGNATURE_REQUEST_UPDATE` — notifica cambios de estado de la solicitud.
+  - Tipo `NOTIFICATION` — mensajes generales.
+
+Payload sugerido para notificaciones:
+
+```json
+{ "type": "SIGNATURE_REQUEST", "payload": { "requestId": 456, "documentPath": "...", "message": "Nueva solicitud" } }
+```
+
+El frontend tiene `WebSocketService.ts` para gestionar la conexión y listeners.
+
+## PyHanko / Firma digital
+
+El proceso de firma final se realiza por PyHanko (Python). El backend invoca un script o servicio que:
+
+- Recibe: `documentPath`, `page`, `posX`, `posY`, `certificate` (o `certificateId` + password)
+- Genera el PDF firmado y lo guarda sobre `files/uploads/documents/...` o en una carpeta configurada.
+
+Para ejecutar PyHanko localmente asegúrate de instalarlo en un entorno virtual:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install pyhanko
+```
+
+El repositorio incluye scripts y utilidades en `ES-Backend/src/main/java/.../signer` que integran la llamada al servicio de firma (o proceso externo).
+
+## Debug y desarrollo
+
+- Backend: usa las configuraciones de VSCode en `.vscode/launch.json` o ejecuta con `mvnw spring-boot:run` y adjunta un debugger.
+- Frontend: Vite ofrece HMR; modifica componentes en `ES-Frontend/src/components` y el navegador recargará.
+
+## Troubleshooting
+
+- Problemas de CORS: revisa `SecurityConfig` en el backend y asegúrate de permitir el origen del frontend durante desarrollo.
+- PDFs no cargan: asegúrate de que `files/uploads` tiene permisos y que la ruta en `DocumentMetadata` es correcta.
+- Errores de firma: activa logs del módulo de firma y comprueba que PyHanko está instalado y accesible desde el backend.
+
+## Contribuir
+
+1. Abre un issue describiendo la mejora o bug.
+2. Crea una rama con nombre descriptivo (`feature/xxx` o `fix/yyy`).
+3. Envía un PR con cambios y pruebas cuando aplique.
+
+## Licencia
+
+Este proyecto no incluye una licencia por defecto en el repositorio adjunto; añade un `LICENSE` si quieres publicar algo con términos claros (MIT, Apache-2.0, etc.).
+
+## Contacto y soporte
+
+Para dudas, sugerencias o soporte, contacta al equipo de desarrollo o abre un issue en el repositorio.
+
+
 ## Frontend (Vue.js)
 
 ### Principales Componentes
