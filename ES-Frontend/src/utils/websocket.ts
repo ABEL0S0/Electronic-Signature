@@ -1,5 +1,24 @@
-// WebSocket utility para comunicación en tiempo real
-const WS_URL = import.meta.env.VITE_WS_URL;
+// Antes
+//const WS_URL = import.meta.env.VITE_WS_URL;
+
+// Cambiar por:
+const getWebSocketUrl = () => {
+    const configuredUrl = import.meta.env.VITE_WS_URL;
+    console.log('VITE_WS_URL from env:', configuredUrl);
+    console.log('All env variables:', import.meta.env);
+    
+    if (configuredUrl) {
+        return configuredUrl;
+    }
+    
+    // Fallback: construir la URL basada en la ubicación actual
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const fallbackUrl = `${protocol}//${window.location.host}/ws`;
+    console.log('Using fallback WebSocket URL:', fallbackUrl);
+    return fallbackUrl;
+};
+
+const WS_URL = getWebSocketUrl();
 
 interface AuthSuccessMessage {
   userEmail: string;
@@ -74,7 +93,10 @@ class WebSocketManager {
 
   private async connectWithWebSocket(token: string): Promise<void> {
     return new Promise((resolve, reject) => {
-      this.socket = new WebSocket(WS_URL);
+        console.log('Attempting to connect to WebSocket at:', WS_URL);
+        console.log('Environment variables:', import.meta.env);
+        
+        this.socket = new WebSocket(WS_URL);
       
       this.socket.onopen = () => {
         console.log('✅ WebSocket conectado exitosamente');

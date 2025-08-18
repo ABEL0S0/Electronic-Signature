@@ -6,6 +6,7 @@ import com.ES.Backend.service.CertificateService;
 import com.ES.Backend.service.DocumentMetadataService;
 import com.ES.Backend.service.JwtService;
 
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -106,19 +107,39 @@ public class DocumentMetadataController {
         @RequestHeader(HttpHeaders.AUTHORIZATION) String authHeader,
         @PathVariable String id
     ) {
-        String token = authHeader.substring(7);
-        String user = jwtService.extractUser(token);
-        DocumentMetadata metadata = service.downloadDocument(id); 
-
-        if (!metadata.getuser().equals(user)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-        }
-        
         try {
+            System.out.println("Attempting to delete document with ID: " + id);
+            String token = authHeader.substring(7);
+            String user = jwtService.extractUser(token);
+            
+            DocumentMetadata metadata = service.downloadDocument(id);
+            if (metadata == null) {
+                System.err.println("Document not found: " + id);
+                return ResponseEntity.notFound().build();
+            }
+
+            if (!metadata.getuser().equals(user)) {
+                System.err.println("Unauthorized deletion attempt by user " + user + " for document " + id);
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Not authorized to delete this document");
+            }
+            
             service.deleteDocument(id);
+            System.out.println("Document successfully deleted: " + id);
             return ResponseEntity.ok().build();
+            
+        } catch (ResponseStatusException e) {
+            System.err.println("Response status exception: " + e.getMessage());
+            return ResponseEntity.status(e.getStatusCode()).body(e.getReason());
         } catch (IOException e) {
-            return ResponseEntity.internalServerError().body("Error deleting document: " + e.getMessage());
+            System.err.println("IO Exception while deleting document: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                            .body("Error deleting document file: " + e.getMessage());
+        } catch (Exception e) {
+            System.err.println("Unexpected error while deleting document: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                            .body("Unexpected error: " + e.getMessage());
         }
     }
 
@@ -190,7 +211,7 @@ public class DocumentMetadataController {
 
             String pdfInput = metadata.getFilePath();
             String pdfOutput = pdfInput.replace(".pdf", "_signed.pdf");
-            String stylePath = "src/main/java/com/ES/Backend/signer/stamp-style.yml";
+            //String stylePath = "src/main/java/com/ES/Backend/signer/stamp-style.yml";
             System.out.println("[signDocument] PDF de entrada: " + pdfInput);
             System.out.println("[signDocument] PDF de salida: " + pdfOutput);
             //System.out.println("[signDocument] Style YAML: " + stylePath);
@@ -206,8 +227,10 @@ public class DocumentMetadataController {
             System.out.println("[signDocument] Ejecutando script Python: " + pb.command());
             Process process = pb.start();
             java.io.InputStream is = process.getInputStream();
-            java.util.Scanner s = new java.util.Scanner(is).useDelimiter("\\A");
-            String output = s.hasNext() ? s.next() : "";
+            String output;
+            try (java.util.Scanner s = new java.util.Scanner(is).useDelimiter("\\A")) {
+                output = s.hasNext() ? s.next() : "";
+            }
             System.out.println("[signDocument] Salida del script Python:\n" + output);
             int exitCode = process.waitFor();
             System.out.println("[signDocument] Código de salida del script: " + exitCode);

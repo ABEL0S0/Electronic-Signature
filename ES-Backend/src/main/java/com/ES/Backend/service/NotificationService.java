@@ -4,7 +4,6 @@ import com.ES.Backend.controller.WebSocketController;
 import com.ES.Backend.entity.Certificate;
 import com.ES.Backend.entity.CertificateRequest;
 import com.ES.Backend.entity.DocumentMetadata;
-import com.ES.Backend.entity.User;
 import com.ES.Backend.repository.CertificateRepository;
 import com.ES.Backend.repository.DocumentMetadataRepository;
 import org.springframework.beans.factory.annotation.Autowired;

@@ -1,9 +1,8 @@
 package com.ES.Backend.service;
 
 import java.io.ByteArrayOutputStream;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.math.BigInteger;
+import java.nio.file.Paths;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.KeyStore;
@@ -11,9 +10,7 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.security.Security;
-import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
-import java.security.spec.KeySpec;
 import java.util.Base64;
 import java.util.Date;
 import java.util.List;
@@ -21,11 +18,7 @@ import java.util.Optional;
 
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
-import javax.crypto.SecretKeyFactory;
-import javax.crypto.spec.PBEKeySpec;
-import javax.crypto.spec.SecretKeySpec;
 
-import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.BasicConstraints;
 import org.bouncycastle.asn1.x509.Extension;
@@ -34,20 +27,13 @@ import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
 import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import org.bouncycastle.openssl.PEMKeyPair;
-import org.bouncycastle.openssl.PEMParser;
-import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter;
 import org.bouncycastle.operator.ContentSigner;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.ES.Backend.entity.Certificate;
 import com.ES.Backend.repository.CertificateRepository;
-import com.ES.Backend.service.NotificationService;
-
-import jakarta.annotation.PostConstruct;
 
 
 @Service
@@ -162,30 +148,45 @@ public class CertificateService {
     
     // Implementa generateUserCertificate usando BouncyCastle para firmar con tu CA
     public X509Certificate generateUserCertificate(String nombre, String correo, String organizacion, PublicKey userPublicKey) throws Exception {
-        Security.addProvider(new BouncyCastleProvider());
+    Security.addProvider(new BouncyCastleProvider());
 
-        // Exportar la CA a archivos PEM en files/uploads/tmp
-        try {
-            java.io.File tmpDir = new java.io.File("files/uploads/tmp");
-            if (!tmpDir.exists()) {
-                tmpDir.mkdirs();
-            }
-            // Guardar el certificado de la CA
-            java.io.File caCertFile = new java.io.File(tmpDir, "ca-cert.pem");
-            try (java.io.FileWriter fw = new java.io.FileWriter(caCertFile);
-                 org.bouncycastle.openssl.jcajce.JcaPEMWriter pemWriter = new org.bouncycastle.openssl.jcajce.JcaPEMWriter(fw)) {
-                pemWriter.writeObject(this.caCertificate);
-            }
-            // Guardar la clave privada de la CA
-            java.io.File caKeyFile = new java.io.File(tmpDir, "ca-key.pem");
-            try (java.io.FileWriter fw = new java.io.FileWriter(caKeyFile);
-                 org.bouncycastle.openssl.jcajce.JcaPEMWriter pemWriter = new org.bouncycastle.openssl.jcajce.JcaPEMWriter(fw)) {
-                pemWriter.writeObject(this.caPrivateKey);
-            }
-        } catch (Exception e) {
-            System.err.println("Error exportando la CA: " + e.getMessage());
+    // Exportar la CA a archivos PEM en files/uploads/tmp con ruta absoluta
+    try {
+        String rootPath = Paths.get("files").toAbsolutePath().toString();
+        java.io.File tmpDir = new java.io.File(rootPath + "/uploads/tmp");
+        if (!tmpDir.exists()) {
+            tmpDir.mkdirs();
+        }
+        
+        // Guardar el certificado de la CA
+        java.io.File caCertFile = new java.io.File(tmpDir, "ca-cert.pem");
+        try (java.io.FileWriter fw = new java.io.FileWriter(caCertFile);
+             org.bouncycastle.openssl.jcajce.JcaPEMWriter pemWriter = new org.bouncycastle.openssl.jcajce.JcaPEMWriter(fw)) {
+            pemWriter.writeObject(this.caCertificate);
+            System.out.println("CA certificate saved to: " + caCertFile.getAbsolutePath());
+        }
+        
+        // Guardar la clave privada de la CA
+        java.io.File caKeyFile = new java.io.File(tmpDir, "ca-key.pem");
+        try (java.io.FileWriter fw = new java.io.FileWriter(caKeyFile);
+             org.bouncycastle.openssl.jcajce.JcaPEMWriter pemWriter = new org.bouncycastle.openssl.jcajce.JcaPEMWriter(fw)) {
+            pemWriter.writeObject(this.caPrivateKey);
+            System.out.println("CA private key saved to: " + caKeyFile.getAbsolutePath());
         }
 
+        // Establecer permisos adecuados
+        caCertFile.setReadable(true, false);
+        caKeyFile.setReadable(true, false);
+        caCertFile.setWritable(true, false);
+        caKeyFile.setWritable(true, false);
+        
+    } catch (Exception e) {
+        System.err.println("Error exportando la CA: " + e.getMessage());
+        e.printStackTrace();
+        throw e;
+    }
+
+    // Resto del método permanece igual...
         // Ordenar el subject y el issuer para que coincidan exactamente
         String caEmail = "electronic.signature@gmail.com";
         String caDn = "emailAddress=" + caEmail + ", CN=ESI, OU=E-S, O=E-Signature, L=Esmeraldas, ST=Esmeraldas, C=EC";
@@ -311,28 +312,5 @@ public class CertificateService {
         notificationService.checkAndNotifyUserStatus(username);
     }
 
-    private String bytesToHex(byte[] bytes) {
-        StringBuilder sb = new StringBuilder();
-        for (byte b : bytes) {
-            sb.append(String.format("%02x", b));
-        }
-        return sb.toString();
-    }
 
-    private PrivateKey loadPrivateKeyFromPem(InputStream inputStream) throws Exception {
-        Security.addProvider(new BouncyCastleProvider());
-        try (PEMParser pemParser = new PEMParser(new InputStreamReader(inputStream))) {
-            Object object = pemParser.readObject();
-            JcaPEMKeyConverter converter = new JcaPEMKeyConverter().setProvider("BC");
-    
-            if (object instanceof PEMKeyPair) {
-                return converter.getKeyPair((PEMKeyPair) object).getPrivate();
-            } else if (object instanceof PrivateKeyInfo) {
-                return converter.getPrivateKey((PrivateKeyInfo) object);
-            } else {
-                throw new IllegalArgumentException("Formato de clave no soportado");
-            }
-        }
-    }
-   
 }

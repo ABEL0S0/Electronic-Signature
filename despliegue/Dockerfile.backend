@@ -2,16 +2,28 @@
 FROM maven:3.9.6-eclipse-temurin-21 AS build
 WORKDIR /app
 COPY ES-Backend/pom.xml .
+# Descarga las dependencias primero para aprovechar la caché de Docker
+RUN mvn dependency:go-offline
 COPY ES-Backend/src ./src
 RUN mvn -f pom.xml clean package -DskipTests
 
 FROM eclipse-temurin:21-jre
 WORKDIR /app
 
-# Instalar Python y dependencias necesarias
+# Create directory for Python scripts first
+RUN mkdir -p /app/src/main/java/com/ES/Backend/signer/
+
+# Copy the Python script and related files
+COPY ES-Backend/src/main/java/com/ES/Backend/signer/firmar-pdf.py \
+     ES-Backend/src/main/java/com/ES/Backend/signer/stamp-style.yml \
+     ES-Backend/src/main/java/com/ES/Backend/signer/firma.png \
+     /app/src/main/java/com/ES/Backend/signer/
+
+# Install system dependencies
 RUN apt-get update && \
-    apt-get install -y \
+    apt-get install -y --no-install-recommends \
     python3 \
+    python3-venv \
     python3-pip \
     python3-dev \
     build-essential \
@@ -21,24 +33,30 @@ RUN apt-get update && \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Instalar pyhanko y sus dependencias
-RUN pip3 install --no-cache-dir \
-    pyhanko \
-    pyhanko-certvalidator \
-    cryptography \
-    qrcode
+# Create and activate virtual environment
+RUN python3 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 
-# Copiar el JAR y otros archivos necesarios
+# Install Python dependencies
+RUN pip3 install --no-cache-dir \
+    pyhanko==0.29.1 \
+    pyhanko-certvalidator==0.27.0 \
+    cryptography==43.0.3 \
+    qrcode==7.4.2
+
+# Copy the JAR file
 COPY --from=build /app/target/*.jar app.jar
 
-# Crear directorio para los scripts Python
-COPY ES-Backend/src/main/java/com/ES/Backend/signer/firmar-pdf.py /app/src/main/java/com/ES/Backend/signer/
-
-# Crear directorios necesarios y establecer permisos
+# Create necessary directories and set permissions
 RUN mkdir -p /app/files/uploads/tmp /app/files/uploads/documents && \
-    chmod -R 777 /app/files
+    chmod -R 777 /app/files && \
+    chmod +x /app/src/main/java/com/ES/Backend/signer/firmar-pdf.py
+
+# Verificar permisos
+RUN ls -la /app/files/uploads/documents && \
+    ls -la /app/files/uploads/tmp
 
 WORKDIR /app
 EXPOSE 8080
-ENV JAVA_OPTS=""
+ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
 CMD ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]

@@ -34,8 +34,8 @@ public class CertificateRequestController {
             @RequestBody CertRequestDTO request,
             @RequestHeader(HttpHeaders.AUTHORIZATION) String authHeader) {
         
-        String token = authHeader.substring(7);
-        String userEmail = jwtService.extractUser(token);
+        //String token = authHeader.substring(7);
+        //String userEmail = jwtService.extractUser(token);
         
         CertificateRequest certificateRequest = service.createRequest(
             request.getCorreo(),
@@ -51,8 +51,8 @@ public class CertificateRequestController {
     public ResponseEntity<List<CertificateRequest>> getPendingRequests(
             @RequestHeader(HttpHeaders.AUTHORIZATION) String authHeader) {
         
-        String token = authHeader.substring(7);
-        String userEmail = jwtService.extractUser(token);
+        //String token = authHeader.substring(7);
+        //String userEmail = jwtService.extractUser(token);
         
         // Aquí podrías verificar si el usuario es admin
         List<CertificateRequest> pendingRequests = service.getPendingRequests();
@@ -63,8 +63,8 @@ public class CertificateRequestController {
     public ResponseEntity<List<CertificateRequest>> getAllRequests(
             @RequestHeader(HttpHeaders.AUTHORIZATION) String authHeader) {
         
-        String token = authHeader.substring(7);
-        String userEmail = jwtService.extractUser(token);
+        //String token = authHeader.substring(7);
+        //String userEmail = jwtService.extractUser(token);
         
         // Aquí podrías verificar si el usuario es admin
         List<CertificateRequest> allRequests = service.getAllRequests();

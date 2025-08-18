@@ -11,7 +11,6 @@ import org.springframework.http.HttpStatus;
 
 import com.ES.Backend.entity.DocumentMetadata;
 import com.ES.Backend.repository.DocumentMetadataRepository;
-import com.ES.Backend.service.NotificationService;
 
 import java.io.File;
 import java.io.IOException;
@@ -20,7 +19,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.UUID;
 
 @Service
 public class DocumentMetadataService {
@@ -79,10 +77,31 @@ public class DocumentMetadataService {
 
     public void deleteDocument(String id) throws IOException {
         DocumentMetadata metadata = repository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Document with id " + id + " not found."));
+            .orElseThrow(() -> new ResponseStatusException(
+                HttpStatus.NOT_FOUND,
+                "Document with id " + id + " not found."
+            ));
         
-        Files.deleteIfExists(Paths.get(metadata.getFilePath()));
-        repository.deleteById(id);
+        Path filePath = Paths.get(metadata.getFilePath());
+        if (!Files.exists(filePath)) {
+            System.err.println("Warning: File does not exist: " + filePath);
+        } else {
+            try {
+                Files.delete(filePath);
+            } catch (IOException e) {
+                System.err.println("Error deleting file: " + filePath);
+                e.printStackTrace();
+                throw new IOException("Could not delete file: " + e.getMessage());
+            }
+        }
+        
+        try {
+            repository.deleteById(id);
+        } catch (Exception e) {
+            System.err.println("Error deleting document from database: " + id);
+            e.printStackTrace();
+            throw new RuntimeException("Could not delete document from database: " + e.getMessage());
+        }
     }
 
     public DocumentMetadata downloadDocument(String id) {
