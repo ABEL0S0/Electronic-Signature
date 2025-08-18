@@ -1,6 +1,43 @@
 # Electronic Signature - README
 
-## Descripción General
+
+## Diagrama de Secuencia (Flujo Principal)
+
+```plantuml
+@startuml
+actor Usuario
+participant "Frontend (Vue.js)" as FE
+participant "Backend (Spring Boot)" as BE
+participant "PyHanko (Firma)" as PyHanko
+
+== Subida y solicitud de firma ==
+Usuario -> FE: Sube PDF
+FE -> BE: POST /api/documents/upload
+BE -> BE: Guarda PDF y metadatos
+BE --> FE: DocumentMetadata
+FE -> BE: POST /api/signature-requests
+BE -> BE: Crea SignatureRequest y notifica usuarios
+BE --> FE: SignatureRequest
+BE -> FE: WebSocket SIGNATURE_REQUEST (a usuarios)
+
+== Proceso de firma ==
+Usuario -> FE: Visualiza y responde solicitud
+FE -> BE: POST /api/signature-requests/respond
+BE -> BE: Actualiza estado de usuario
+BE -> FE: WebSocket SIGNATURE_REQUEST_UPDATE
+BE -> BE: (Si todos permiten) Ejecuta PyHanko
+BE -> PyHanko: Ejecuta script de firma
+PyHanko --> BE: PDF firmado
+BE -> BE: Actualiza metadatos y almacena PDF firmado
+BE --> FE: Notificación y descarga disponible
+
+== Descarga ==
+Usuario -> FE: Descarga documento firmado
+FE -> BE: GET /api/documents/download/{id}
+BE --> FE: PDF firmado
+FE --> Usuario: PDF
+@enduml
+```
 
 **Electronic Signature** es una plataforma web para la gestión, firma electrónica y flujo de aprobación de documentos PDF. Permite a los usuarios subir documentos, solicitar firmas a otros usuarios, firmar digitalmente con certificados, y recibir notificaciones en tiempo real mediante WebSockets.
 
@@ -14,61 +51,119 @@ El sistema está compuesto por:
 
 ## Estructura de Carpetas
 
+
 ```
 Electronic-Signature/
-├── despliegue/           # Archivos de despliegue (Docker, nginx, scripts)
-├── ES-Backend/           # Backend Java Spring Boot
+├── despliegue/                      # Archivos de despliegue y configuración
+│   ├── docker-compose.yml           # Stack completo (backend, frontend, MongoDB, nginx)
+│   ├── Dockerfile.backend           # Dockerfile para el backend
+│   ├── Dockerfile.frontend          # Dockerfile para el frontend
+│   ├── env.example                  # Variables de entorno de ejemplo
+│   ├── nginx.conf                   # Configuración de nginx
+│   ├── ssl/                         # Certificados SSL y README
+│   └── scripts/                     # Scripts de utilidades
+│       └── generate-self-signed.sh  # Script para generar certificados autofirmados
+├── ES-Backend/                      # Backend Java Spring Boot
+│   ├── mvnw, mvnw.cmd               # Maven Wrapper
+│   ├── pom.xml                      # Dependencias y configuración Maven
 │   ├── src/
-│   │   ├── main/java/com/ES/Backend/
-│   │   │   ├── controller/         # Controladores REST y WebSocket
-│   │   │   ├── entity/             # Entidades JPA y MongoDB
-│   │   │   ├── repository/         # Repositorios JPA/Mongo
-│   │   │   ├── service/            # Lógica de negocio
-│   │   │   └── signer/             # Scripts y recursos de firma (PyHanko)
-│   │   └── resources/
-│   └── files/uploads/    # Almacenamiento de PDFs y temporales
-├── ES-Frontend/          # Frontend Vue.js
-│   ├── src/
-│   │   ├── components/   # Componentes Vue
-│   │   ├── pages/        # Vistas principales
-│   │   ├── service/      # Servicios de API y WebSocket
-│   │   └── utils/        # Utilidades
-└── ...
+│   │   ├── main/
+│   │   │   ├── java/com/ES/Backend/
+│   │   │   │   ├── EsBackendApplication.java   # Main Spring Boot
+│   │   │   │   ├── config/                    # Configuración de seguridad, WebSocket, etc.
+│   │   │   │   ├── controller/                # Controladores REST y WebSocket
+│   │   │   │   ├── entity/                    # Entidades JPA y MongoDB
+│   │   │   │   ├── repository/                # Repositorios JPA/Mongo
+│   │   │   │   ├── service/                   # Lógica de negocio
+│   │   │   │   └── signer/                    # Integración PyHanko/scripts de firma
+│   │   │   └── resources/
+│   │   │       └── application.properties     # Configuración de Spring Boot
+│   │   └── test/java/com/ES/Backend/          # Tests unitarios
+│   └── files/uploads/
+│       ├── documents/                         # PDFs subidos y firmados
+│       └── tmp/                               # Archivos temporales y certificados CA
+├── ES-Frontend/                              # Frontend Vue.js + Vite
+│   ├── index.html                            # HTML principal
+│   ├── package.json                          # Dependencias y scripts npm
+│   ├── tailwind.config.js, postcss.config.js  # Configuración TailwindCSS
+│   ├── vite.config.ts                        # Configuración Vite
+│   ├── public/                               # Archivos públicos y assets
+│   └── src/
+│       ├── App.vue, main.ts, style.css        # Entradas principales
+│       ├── assets/                            # Imágenes y recursos
+│       ├── components/                        # Componentes Vue reutilizables
+│       ├── pages/                             # Vistas principales (Dashboard, Login, etc.)
+│       ├── service/                           # Servicios de API, WebSocket, Auth
+│       └── utils/                             # Utilidades y helpers
+└── README.md                                 # Documentación principal
 ```
 
 ---
 
 ## Topología de Bases de Datos
 
+
 ### MongoDB (NoSQL)
-- **DocumentMetadata**:  
-  - id (ObjectId)
+- **DocumentMetadata**:
+  - id (String, ObjectId)
   - user (String, email)
   - fileName (String)
   - filePath (String, ruta absoluta/relativa)
   - isSigned (boolean)
-  - uploadedAt (datetime)
+  - uploadedAt (LocalDateTime)
+
+- **Certificate**:
+  - id (String, ObjectId)
+  - user (String, email)
+  - filename (String)
+  - data (byte[], certificado cifrado)
+  - saltHex (String, salt PBKDF2)
+  - ivHex (String, IV AES)
+  - createdAt (Instant)
 
 ### Relacional (JPA/Hibernate, por ejemplo MySQL/Postgres)
+- **User**:
+  - id (Long, autoincrement)
+  - firstName (String)
+  - lastName (String)
+  - email (String, único)
+  - password (String, hash)
+  - verified (boolean)
+  - verificationCode (String)
+  - role (String: USER, ADMIN)
+  - createdAt (Date)
+  - passwordResetCode (String)
+
 - **SignatureRequest**:
   - id (Long, autoincrement)
   - documentPath (String, ruta del archivo PDF)
   - status (String: PENDIENTE, COMPLETADO)
-  - createdAt (datetime)
+  - createdAt (LocalDateTime)
   - users (List<SignatureRequestUser>)
 
 - **SignatureRequestUser**:
-  - id (Long)
-  - userId (Long)
-  - page, posX, posY (int)
+  - id (Long, autoincrement)
+  - userId (Long, referencia a User)
+  - page (int)
+  - posX (int)
+  - posY (int)
   - status (String: PENDIENTE, PERMITIDO, DENEGADO)
-  - certificateId (String)
+  - certificateId (String, referencia a Certificate)
   - certificatePassword (String)
   - signatureRequest (SignatureRequest, FK)
-  - respondedAt (datetime)
+  - respondedAt (LocalDateTime)
 
-- **User** y **Certificate**:  
-  - Gestión de usuarios y certificados digitales
+- **CertificateRequest**:
+  - id (Long, autoincrement)
+  - userEmail (String)
+  - userName (String)
+  - organization (String)
+  - password (String)
+  - status (String: PENDING, APPROVED, REJECTED)
+  - requestedAt (Date)
+  - processedAt (Date)
+  - processedBy (String)
+  - rejectionReason (String)
 
 ---
 
