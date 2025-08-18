@@ -19,7 +19,7 @@ services:
       SPRING_MAIL_PORT: ${SPRING_MAIL_PORT}
       FRONTEND_URL: ${FRONTEND_URL}
     volumes:
-      - backend_uploads:/app/uploads
+      - backend_uploads:/app/files/uploads
     expose:
       - "8080"
     networks:
@@ -31,15 +31,10 @@ services:
       dockerfile: despliegue/Dockerfile.frontend
     container_name: es_frontend
     restart: unless-stopped
-    environment:
-      VITE_API_URL: ${VITE_API_URL}
-      VITE_WS_URL: ${VITE_WS_URL}
-    depends_on:
-      - backend
-    expose:
-      - "80"
     networks:
       - app_network
+    volumes:
+      - frontend_dist:/app/dist
 
   nginx:
     image: nginx:alpine
@@ -50,8 +45,8 @@ services:
       - "443:443"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./ssl:/etc/ssl:ro
-      - backend_uploads:/var/www/backend/uploads:ro
+      - ./ssl/letsencrypt:/etc/letsencrypt:ro
+      - backend_uploads:/var/www/backend/files/uploads:ro
       - frontend_dist:/var/www/frontend/dist:ro
     depends_on:
       - frontend

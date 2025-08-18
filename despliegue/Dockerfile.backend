@@ -7,7 +7,38 @@ RUN mvn -f pom.xml clean package -DskipTests
 
 FROM eclipse-temurin:21-jre
 WORKDIR /app
+
+# Instalar Python y dependencias necesarias
+RUN apt-get update && \
+    apt-get install -y \
+    python3 \
+    python3-pip \
+    python3-dev \
+    build-essential \
+    libssl-dev \
+    libffi-dev \
+    && ln -s /usr/bin/python3 /usr/bin/python \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Instalar pyhanko y sus dependencias
+RUN pip3 install --no-cache-dir \
+    pyhanko \
+    pyhanko-certvalidator \
+    cryptography \
+    qrcode
+
+# Copiar el JAR y otros archivos necesarios
 COPY --from=build /app/target/*.jar app.jar
+
+# Crear directorio para los scripts Python
+COPY ES-Backend/src/main/java/com/ES/Backend/signer/firmar-pdf.py /app/src/main/java/com/ES/Backend/signer/
+
+# Crear directorios necesarios y establecer permisos
+RUN mkdir -p /app/files/uploads/tmp /app/files/uploads/documents && \
+    chmod -R 777 /app/files
+
+WORKDIR /app
 EXPOSE 8080
 ENV JAVA_OPTS=""
 CMD ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
