@@ -39,6 +39,8 @@ FE --> Usuario: PDF
 @enduml
 ```
 
+![Diagrama de Secuencia](https://cdn-0.plantuml.com/plantuml/png/ZPBDRjD04CVlVefHJyaX-5ufg36s2mUAYPDoh2QxqsXRUyViXr11F1MFm8knjZTEQAggnvtvpSV_ltDb7HhdsoP1uTZ0rdeqYfCkH9LG7Me75wLXxKXBcDrwUlTWvnU05ihYVof3yJX0TMUKtaF6x4OoUqPMJnzHFpBCIcLQ79aOIvBb4cg_KnBX2ImteSXv2PBWleTXkKpYZh1u7tQux6c2AY-JikX3MGXLN-eDfDYfLBBmBMbdKzyrZ3B99kZQev7OLuP9BJcKwDWEGEoSn-BFOn9Vd63LNgFpXXQ6ldkopfxC-608eJuGwn48upGxTQy4WX-rd8uzu_jSJ7sZNSt1PWVrf-kRrMQxBkxMnTTj4RQP7RlD1nihmu8il-RThGhlHltipJPaEzQIZgw_KMyQAqzqhuIBVGE0SjWXBlSsDNVRAbzjYfEMirg1OyaMEZAjSgJdK3oGy0wdundf-BgSqbOOrRd9XoG2i3Y8oyin8_b53TDn19UmQL6GnhEYgEac_gnGV__em4ko0iqUGQhU9BLhQFYS_10__vGfTJXUdWQLn-ijpYvSyW_TttZwIydVqqxFz9LZE8uSSiaLQUdRvXy0)
+
 **Electronic Signature** es una plataforma web para la gestión, firma electrónica y flujo de aprobación de documentos PDF. Permite a los usuarios subir documentos, solicitar firmas a otros usuarios, firmar digitalmente con certificados, y recibir notificaciones en tiempo real mediante WebSockets.
 
 El sistema está compuesto por:
