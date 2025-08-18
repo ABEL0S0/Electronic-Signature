@@ -114,4 +114,21 @@ public class DocumentMetadataService {
     public void updateDocument(DocumentMetadata metadata) {
         repository.save(metadata);
     }
+
+    public DocumentMetadata findDocumentByPath(String filePath) {
+        // Buscar documento por ruta de archivo
+        List<DocumentMetadata> allDocuments = repository.findAll();
+        
+        // Normalizar la ruta para comparación (convertir backslashes a forward slashes)
+        String normalizedSearchPath = filePath.replace('\\', '/');
+        
+        for (DocumentMetadata doc : allDocuments) {
+            String normalizedDocPath = doc.getFilePath().replace('\\', '/');
+            if (normalizedDocPath.equals(normalizedSearchPath)) {
+                return doc;
+            }
+        }
+        
+        return null;
+    }
 }

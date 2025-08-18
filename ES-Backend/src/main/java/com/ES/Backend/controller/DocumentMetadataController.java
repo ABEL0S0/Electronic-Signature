@@ -131,6 +131,22 @@ public class DocumentMetadataController {
             .body(pdf);
     }
 
+    @GetMapping("/search")
+    public ResponseEntity<?> searchDocumentByPath(
+        @RequestParam String filepath
+    ) {
+        try {
+            DocumentMetadata metadata = service.findDocumentByPath(filepath);
+            if (metadata != null) {
+                return ResponseEntity.ok(metadata);
+            } else {
+                return ResponseEntity.notFound().build();
+            }
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("Error: " + e.getMessage());
+        }
+    }
+
     @PostMapping("/sign/{id}")
     public ResponseEntity<?> signDocument(
         @RequestHeader(HttpHeaders.AUTHORIZATION) String authHeader,
