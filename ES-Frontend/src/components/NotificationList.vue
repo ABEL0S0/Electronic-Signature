@@ -192,7 +192,7 @@ onMounted(() => {
     // Limpiar listeners existentes antes de agregar nuevos
     webSocketService.removeListener('user');
     webSocketService.removeListener('admin');
-    webSocketService.removeListener('auth_success');
+
     
     // Escuchar notificaciones de usuario
     webSocketService.addListener('user', (message) => {
@@ -205,12 +205,7 @@ onMounted(() => {
     });
     
     // Escuchar autenticación exitosa
-    webSocketService.addListener('auth_success', (data) => {
-      // Reconfigurar listeners después de autenticación exitosa
-      setTimeout(() => {
-        setupListeners();
-      }, 100);
-    });
+
   };
   
   // Función para limpiar notificaciones
@@ -248,7 +243,7 @@ onMounted(() => {
 onUnmounted(() => {
   webSocketService.removeListener('user');
   webSocketService.removeListener('admin');
-  webSocketService.removeListener('auth_success');
+
   document.removeEventListener('click', handleClickOutside);
 });
 </script> 

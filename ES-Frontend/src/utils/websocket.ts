@@ -1,6 +1,46 @@
 // WebSocket utility para comunicación en tiempo real
 const WS_URL = import.meta.env.VITE_WS_URL;
+
+interface AuthSuccessMessage {
+  userEmail: string;
+  userRole: string;
+  userId: number;
+}
+
+interface NotificationMessage {
+  title: string;
+  message: string;
+  timestamp: string;
+}
+
+interface SignatureRequestMessage {
+  requestId: number;
+  documentPath: string;
+  documentName: string;
+  page: number;
+  posX: number;
+  posY: number;
+  timestamp: string;
+}
+
+interface SignatureRequestUpdateMessage {
+  requestId: number;
+  status: string;
+  message: string;
+  timestamp: string;
+}
+
+type MessageListener = (message: any) => void;
+
 class WebSocketManager {
+  private socket: WebSocket | null;
+  private isConnected: boolean;
+  private reconnectAttempts: number;
+  private readonly maxReconnectAttempts: number;
+  private listeners: Map<string, MessageListener>;
+  private token: string;
+  private manualDisconnect: boolean;
+
   constructor() {
     this.socket = null;
     this.isConnected = false;
@@ -11,7 +51,7 @@ class WebSocketManager {
     this.manualDisconnect = false; // Flag to prevent auto-reconnection after manual disconnect
   }
 
-  async connect(token) {
+  async connect(token: string): Promise<void> {
     if (this.isConnected) return;
     
     // Reset manual disconnect flag when connecting with a new token
@@ -32,7 +72,7 @@ class WebSocketManager {
     }
   }
 
-  async connectWithWebSocket(token) {
+  private async connectWithWebSocket(token: string): Promise<void> {
     return new Promise((resolve, reject) => {
       this.socket = new WebSocket(WS_URL);
       
@@ -62,7 +102,7 @@ class WebSocketManager {
     });
   }
 
-  handleMessage(data) {
+  private handleMessage(data: string): void {
     try {
       console.log('📨 Mensaje recibido:', data);
       
@@ -73,10 +113,14 @@ class WebSocketManager {
       } else if (parsedData.type === 'AUTH_SUCCESS') {
         console.log('🔐 Autenticación exitosa:', parsedData.message, 'Usuario:', parsedData.userEmail);
         // Notificar que la autenticación fue exitosa
-        this.notifyListeners('auth_success', { userEmail: parsedData.userEmail, userRole: parsedData.userRole, userId: parsedData.userId });
+        this.notifyListeners('auth_success', {
+          userEmail: parsedData.userEmail,
+          userRole: parsedData.userRole,
+          userId: parsedData.userId
+        } as AuthSuccessMessage);
       } else if (parsedData.type === 'NOTIFICATION') {
         console.log('🔔 Notificación recibida:', parsedData);
-        const notification = {
+        const notification: NotificationMessage = {
           title: parsedData.title,
           message: parsedData.message,
           timestamp: parsedData.timestamp || new Date().toISOString()
@@ -89,7 +133,7 @@ class WebSocketManager {
         }
       } else if (parsedData.type === 'SIGNATURE_REQUEST') {
         console.log('📝 Nueva solicitud de firma recibida:', parsedData);
-        const signatureRequest = {
+        const signatureRequest: SignatureRequestMessage = {
           requestId: parsedData.requestId,
           documentPath: parsedData.documentPath,
           documentName: parsedData.documentName,
@@ -101,7 +145,7 @@ class WebSocketManager {
         this.notifyListeners('signature_request', signatureRequest);
       } else if (parsedData.type === 'SIGNATURE_REQUEST_UPDATE') {
         console.log('🔄 Actualización de solicitud de firma:', parsedData);
-        const update = {
+        const update: SignatureRequestUpdateMessage = {
           requestId: parsedData.requestId,
           status: parsedData.status,
           message: parsedData.message,
@@ -117,7 +161,7 @@ class WebSocketManager {
     }
   }
 
-  sendMessage(message) {
+  sendMessage(message: any): void {
     if (this.socket && this.socket.readyState === 1) { // WebSocket.OPEN = 1
       this.socket.send(JSON.stringify(message));
       console.log('📤 Mensaje enviado:', message);
@@ -126,7 +170,7 @@ class WebSocketManager {
     }
   }
 
-  attemptReconnect() {
+  private attemptReconnect(): void {
     // Don't attempt to reconnect if manually disconnected
     if (this.manualDisconnect) {
       console.log('🔌 Reconexión cancelada - desconexión manual activa');
@@ -145,7 +189,7 @@ class WebSocketManager {
     }
   }
 
-  disconnect() {
+  disconnect(): void {
     this.manualDisconnect = true; // Set flag to prevent auto-reconnection
     this.reconnectAttempts = 0; // Reset reconnect attempts
     
@@ -160,28 +204,33 @@ class WebSocketManager {
     this.listeners.clear();
   }
 
-  addListener(type, callback) {
+  addListener(type: string, callback: MessageListener): void {
     // Si ya existe un listener para este tipo, lo removemos primero
     this.listeners.delete(type);
     this.listeners.set(type, callback);
   }
 
-  removeListener(type) {
+  removeListener(type: string): void {
     this.listeners.delete(type);
   }
 
-  notifyListeners(type, message) {
+  private notifyListeners(type: string, message: any): void {
     const listener = this.listeners.get(type);
     if (listener) {
       listener(message);
     }
   }
 
-  isConnectedStatus() {
+  isConnectedStatus(): boolean {
     return this.isConnected;
   }
 
-  getConnectionInfo() {
+  getConnectionInfo(): {
+    isConnected: boolean;
+    connectionMethod: string;
+    reconnectAttempts: number;
+    maxReconnectAttempts: number;
+  } {
     return {
       isConnected: this.isConnected,
       connectionMethod: 'websocket',
@@ -192,7 +241,4 @@ class WebSocketManager {
 }
 
 // Crear instancia singleton
-const webSocketManager = new WebSocketManager();
-
-// Exportar para uso en otros archivos
-export default webSocketManager; 
+export const webSocketManager = new WebSocketManager();

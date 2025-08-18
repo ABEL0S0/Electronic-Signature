@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, shallowRef, onMounted, computed } from 'vue';
 import axios from 'axios';
-import { getDocumentsByUser, uploadDocument, getCertificatesByUser } from '../utils/api';
+import { uploadDocument, getCertificatesByUser } from '../utils/api';
 import { 
   convertToBackendPage, 
   convertCanvasToPDFCoordinates, 
@@ -226,8 +226,8 @@ function handleCanvasClick(event: MouseEvent) {
   const y = event.clientY - rect.top;
   
   // Convert canvas coordinates to PDF coordinates (simplificado)
-  const pdfX = x / scale.value;
-  const pdfY = y / scale.value;
+  // const pdfX = x / scale.value;
+  // const pdfY = y / scale.value;
   
   // Convertir coordenadas del canvas al sistema PDF estándar
   const pdfCoords = convertCanvasToPDFCoordinates(

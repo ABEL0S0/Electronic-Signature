@@ -1,160 +1,147 @@
 /**
  * Sistema de validación de contraseñas con indicadores de seguridad
  */
-
-export interface PasswordValidationResult {
-  isValid: boolean;
-  score: number; // 0-100
-  strength: 'Muy Débil' | 'Débil' | 'Media' | 'Fuerte' | 'Muy Fuerte';
-  color: string;
-  requirements: {
-    minLength: boolean;
-    hasUppercase: boolean;
-    hasLowercase: boolean;
-    hasNumber: boolean;
-    hasSpecialChar: boolean;
-  };
-  feedback: string[];
-}
-
 /**
  * Valida una contraseña según los criterios de seguridad
  */
-export const validatePassword = (password: string): PasswordValidationResult => {
-  const requirements = {
-    minLength: password.length >= 8,
-    hasUppercase: /[A-Z]/.test(password),
-    hasLowercase: /[a-z]/.test(password),
-    hasNumber: /\d/.test(password),
-    hasSpecialChar: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)
-  };
-
-  // Calcular puntuación (0-100)
-  let score = 0;
-  const feedback: string[] = [];
-
-  // Longitud mínima (20 puntos)
-  if (requirements.minLength) {
-    score += 20;
-  } else {
-    feedback.push('Mínimo 8 caracteres');
-  }
-
-  // Letra mayúscula (20 puntos)
-  if (requirements.hasUppercase) {
-    score += 20;
-  } else {
-    feedback.push('Al menos 1 letra mayúscula');
-  }
-
-  // Letra minúscula (20 puntos)
-  if (requirements.hasLowercase) {
-    score += 20;
-  } else {
-    feedback.push('Al menos 1 letra minúscula');
-  }
-
-  // Número (20 puntos)
-  if (requirements.hasNumber) {
-    score += 20;
-  } else {
-    feedback.push('Al menos 1 número');
-  }
-
-  // Carácter especial (20 puntos)
-  if (requirements.hasSpecialChar) {
-    score += 20;
-  } else {
-    feedback.push('Al menos 1 símbolo especial (!@#$%^&*)');
-  }
-
-  // Bonus por longitud extra
-  if (password.length > 12) score += 10;
-  if (password.length > 16) score += 10;
-
-  // Determinar fortaleza
-  let strength: PasswordValidationResult['strength'];
-  let color: string;
-
-  if (score < 40) {
-    strength = 'Muy Débil';
-    color = 'text-red-600';
-  } else if (score < 60) {
-    strength = 'Débil';
-    color = 'text-orange-600';
-  } else if (score < 80) {
-    strength = 'Media';
-    color = 'text-yellow-600';
-  } else if (score < 90) {
-    strength = 'Fuerte';
-    color = 'text-blue-600';
-  } else {
-    strength = 'Muy Fuerte';
-    color = 'text-green-600';
-  }
-
-  return {
-    isValid: Object.values(requirements).every(req => req),
-    score,
-    strength,
-    color,
-    requirements,
-    feedback
-  };
+export const validatePassword = (password) => {
+    const requirements = {
+        minLength: password.length >= 8,
+        hasUppercase: /[A-Z]/.test(password),
+        hasLowercase: /[a-z]/.test(password),
+        hasNumber: /\d/.test(password),
+        hasSpecialChar: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)
+    };
+    // Calcular puntuación (0-100)
+    let score = 0;
+    const feedback = [];
+    // Longitud mínima (20 puntos)
+    if (requirements.minLength) {
+        score += 20;
+    }
+    else {
+        feedback.push('Mínimo 8 caracteres');
+    }
+    // Letra mayúscula (20 puntos)
+    if (requirements.hasUppercase) {
+        score += 20;
+    }
+    else {
+        feedback.push('Al menos 1 letra mayúscula');
+    }
+    // Letra minúscula (20 puntos)
+    if (requirements.hasLowercase) {
+        score += 20;
+    }
+    else {
+        feedback.push('Al menos 1 letra minúscula');
+    }
+    // Número (20 puntos)
+    if (requirements.hasNumber) {
+        score += 20;
+    }
+    else {
+        feedback.push('Al menos 1 número');
+    }
+    // Carácter especial (20 puntos)
+    if (requirements.hasSpecialChar) {
+        score += 20;
+    }
+    else {
+        feedback.push('Al menos 1 símbolo especial (!@#$%^&*)');
+    }
+    // Bonus por longitud extra
+    if (password.length > 12)
+        score += 10;
+    if (password.length > 16)
+        score += 10;
+    // Determinar fortaleza
+    let strength;
+    let color;
+    if (score < 40) {
+        strength = 'Muy Débil';
+        color = 'text-red-600';
+    }
+    else if (score < 60) {
+        strength = 'Débil';
+        color = 'text-orange-600';
+    }
+    else if (score < 80) {
+        strength = 'Media';
+        color = 'text-yellow-600';
+    }
+    else if (score < 90) {
+        strength = 'Fuerte';
+        color = 'text-blue-600';
+    }
+    else {
+        strength = 'Muy Fuerte';
+        color = 'text-green-600';
+    }
+    return {
+        isValid: Object.values(requirements).every(req => req),
+        score,
+        strength,
+        color,
+        requirements,
+        feedback
+    };
 };
-
 /**
  * Obtiene el color del indicador de fortaleza
  */
-export const getStrengthColor = (score: number): string => {
-  if (score < 40) return 'bg-red-500';
-  if (score < 60) return 'bg-orange-500';
-  if (score < 80) return 'bg-yellow-500';
-  if (score < 90) return 'bg-blue-500';
-  return 'bg-green-500';
+export const getStrengthColor = (score) => {
+    if (score < 40)
+        return 'bg-red-500';
+    if (score < 60)
+        return 'bg-orange-500';
+    if (score < 80)
+        return 'bg-yellow-500';
+    if (score < 90)
+        return 'bg-blue-500';
+    return 'bg-green-500';
 };
-
 /**
  * Obtiene el color del texto del indicador de fortaleza
  */
-export const getStrengthTextColor = (score: number): string => {
-  if (score < 40) return 'text-red-600';
-  if (score < 60) return 'text-orange-600';
-  if (score < 80) return 'text-yellow-600';
-  if (score < 90) return 'text-blue-600';
-  return 'text-green-600';
+export const getStrengthTextColor = (score) => {
+    if (score < 40)
+        return 'text-red-600';
+    if (score < 60)
+        return 'text-orange-600';
+    if (score < 80)
+        return 'text-yellow-600';
+    if (score < 90)
+        return 'text-blue-600';
+    return 'text-green-600';
 };
-
 /**
  * Genera sugerencias para mejorar la contraseña
  */
-export const getPasswordSuggestions = (requirements: PasswordValidationResult['requirements']): string[] => {
-  const suggestions: string[] = [];
-  
-  if (!requirements.minLength) {
-    suggestions.push('Usa al menos 8 caracteres');
-  }
-  if (!requirements.hasUppercase) {
-    suggestions.push('Agrega una letra mayúscula (A-Z)');
-  }
-  if (!requirements.hasLowercase) {
-    suggestions.push('Agrega una letra minúscula (a-z)');
-  }
-  if (!requirements.hasNumber) {
-    suggestions.push('Agrega un número (0-9)');
-  }
-  if (!requirements.hasSpecialChar) {
-    suggestions.push('Agrega un símbolo especial (!@#$%^&*)');
-  }
-  
-  return suggestions;
+export const getPasswordSuggestions = (requirements) => {
+    const suggestions = [];
+    if (!requirements.minLength) {
+        suggestions.push('Usa al menos 8 caracteres');
+    }
+    if (!requirements.hasUppercase) {
+        suggestions.push('Agrega una letra mayúscula (A-Z)');
+    }
+    if (!requirements.hasLowercase) {
+        suggestions.push('Agrega una letra minúscula (a-z)');
+    }
+    if (!requirements.hasNumber) {
+        suggestions.push('Agrega un número (0-9)');
+    }
+    if (!requirements.hasSpecialChar) {
+        suggestions.push('Agrega un símbolo especial (!@#$%^&*)');
+    }
+    return suggestions;
 };
-
 /**
  * Componente de indicador de fortaleza de contraseña
  */
 export const PasswordStrengthIndicator = {
-  template: `
+    template: `
     <div class="password-strength-indicator">
       <div class="flex items-center justify-between mb-2">
         <span class="text-sm font-medium text-gray-700">Fortaleza de la contraseña:</span>
@@ -245,5 +232,5 @@ export const PasswordStrengthIndicator = {
       </div>
     </div>
   `,
-// Eliminado bloque de opciones de Vue 2. Usar solo funciones exportadas y helpers compatibles con Composition API.
+    // Eliminado bloque de opciones de Vue 2. Usar solo funciones exportadas y helpers compatibles con Composition API.
 };
